@@ -48,7 +48,7 @@ chapters. Create navigation links in each document.
 
 *** Logging
     **** Why `fmt.Println` isn’t enough for production.
-    **** `slog` – the new structured logger in Go 1.21/1.22.
+    **** `slog` – the new structured logger in Go 1.26.
          ***** Basic setup, severity levels, context, JSON/text output.
          ***** Adding hooks/sinks, global logger vs per-component loggers.
     **** `zed` – alternative structured logging library.

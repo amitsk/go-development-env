@@ -11,7 +11,7 @@ When you start a new Go project, follow these steps to ensure you're starting wi
 
 ### 1. Initialize the Environment
 - [ ] Create a project folder: `mkdir my-app && cd my-app`
-- [ ] Set your Go version with **mise**: `mise use go@1.23`
+- [ ] Set your Go version with **mise**: `mise use go@1.26`
 - [ ] Initialize your **Go Module**: `go mod init github.com/yourusername/my-app`
 
 ### 2. Set Up Your Structure
@@ -58,6 +58,15 @@ By following these practices, you're not just writing code; you're building a **
 - **Logging & Config** make your app production-ready.
 - **Testing & Linting** ensure your code is high-quality.
 - **CI/CD** keeps your project healthy automatically.
+
+---
+
+## Example Projects
+
+To see these principles in action, check out these real-world examples:
+
+- [**Gin CRUD Demo**](https://github.com/amitsk/gin-crud-demo): A complete REST API using the Gin framework, GORM, and structured logging.
+- [**gRPC View Summary**](https://github.com/amitsk/grpc-view-summary): An advanced example of building a microservice with gRPC and environment-based configuration.
 
 ---
 

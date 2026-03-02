@@ -44,7 +44,7 @@ When you're ready to deploy your Go app, you'll often use [**Docker**](https://w
 ### Example: A Go Dockerfile
 ```dockerfile
 # 1. Build the app
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o heroes ./cmd/heroes

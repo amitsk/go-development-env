@@ -1,0 +1,24 @@
+# IDEs and Editors
+.vscode/
+*.code-workspace
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Build and Binary
+bin/
+dist/
+vendor/
+
+# Environment and Secrets
+.env
+.env.*
+!.env.example

@@ -30,7 +30,7 @@ Before running any Go commands, let's use **mise** to ensure we're using the rig
 Run this command in your project folder to set the Go version:
 
 ```bash
-mise use go@1.23
+mise use go@1.26
 ```
 
 This creates a file named `.mise.toml`. This file tells anyone else working on your project exactly which Go version to use.

@@ -28,7 +28,7 @@ This allows tools to easily search and analyze your logs.
 
 ## Introducing `slog` (Standard Library)
 
-Since Go 1.21, there is a built-in structured logger called `slog`. It's powerful, fast, and easy to use.
+Since Go 1.26, there is a built-in structured logger called `slog`. It's powerful, fast, and easy to use.
 
 ### Basic Setup
 
@@ -78,7 +78,7 @@ While `slog` is the standard, many older projects use [**Zerolog**](https://gith
 
 | Feature | `slog` | `zerolog` |
 |---------|--------|-----------|
-| Included in Go? | Yes (Go 1.21+) | No (requires `go get`) |
+| Included in Go? | Yes (Go 1.26+) | No (requires `go get`) |
 | Performance | Very Good | Excellent (the fastest) |
 | Ease of Use | Easy | Slightly more complex |
 
