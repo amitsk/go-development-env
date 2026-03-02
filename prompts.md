@@ -27,6 +27,12 @@ chapters. Create navigation links in each document.
          `mise run go build`).
     **** Working with `go install`, `go run`, `go test`.
 
+*** Error handling (The Go Way)
+    **** Explain the \"tuple\" return pattern (value, error).
+    **** Why Go doesn't use try/catch like other languages.
+    **** Beginner-friendly explanation of checking for `nil`.
+    **** Standard pattern for bubbling up errors.
+
 *** Package organization
     **** Idiomatic layout (`cmd/`, `pkg/`, `internal/`, `api/`, `configs/`,
          `scripts/`, `test/`).

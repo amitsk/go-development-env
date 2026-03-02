@@ -1,62 +1,95 @@
 # 02. Go Workspace & Modules
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [01-introduction.md](../01-introduction.md)] | [&rarr; [03-package-organization.md](../03-package-organization.md)]
+In this chapter, we'll set up your Go development environment and create your first Go project.
+
+[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [01-introduction.md](../01-introduction.md)] | [&rarr; [03-error-handling.md](./03-error-handling.md)]
 
 ## What is a Go Module?
 
-Go modules manage dependencies since Go 1.11. Run `go mod init github.com/yourusername/project`.
+A **Go Module** is how Go manages dependencies—external libraries your code uses. Every modern Go project is a module. It's simply a collection of Go packages stored in a directory with a `go.mod` file at its root.
 
-Check GOPATH: `go env GOPATH` (legacy, modules replace it).
+- **`go.mod`**: This file tracks your project's name and the versions of libraries it depends on.
+- **`go.sum`**: This file records checksums of your dependencies to ensure they haven't been tampered with.
 
-## Mise for Go Environments
+### Initializing a Module
 
-**mise** handles Go versions/tools like pyenv/uv.
+To start a new project, you'll use the `go mod init` command. Typically, we use a URL (like your GitHub repository) as the module name to ensure it's unique:
 
 ```bash
-# Install Go 1.23
+go mod init github.com/yourusername/heroes-service
+```
+
+---
+
+## Setting Up Go with Mise
+
+Before running any Go commands, let's use **mise** to ensure we're using the right version of Go.
+
+### 1. Tell Mise to use Go
+
+Run this command in your project folder to set the Go version:
+
+```bash
 mise use go@1.23
-mise install go@1.23  # First time
-
-# Project-local .mise.toml or mise.toml
-echo 'tasks:
-  default:
-    run: go run .
-  test:
-    run: go test ./...
-' > mise.toml
 ```
 
-`mise run go build` ensures correct Go version.
+This creates a file named `.mise.toml`. This file tells anyone else working on your project exactly which Go version to use.
 
-## Working with Go Commands
+### 2. Configure Mise Tasks (Optional but Recommended)
 
-```bash
-go mod init example.com/heroes
-go mod tidy  # Add deps
-go run .     # Run main
-go test ./... # Tests
-go install   # Binary to $GOBIN
+Mise can also run tasks for you. Instead of typing long commands, you can define them in `mise.toml`:
+
+```toml
+[tasks.run]
+description = \"Run the application\"
+run = \"go run .\"
+
+[tasks.test]
+description = \"Run all tests\"
+run = \"go test ./...\"
 ```
 
-**Pro tip**: `mise activate` for shell integration.
+Now you can simply run `mise run run` or `mise run test`.
 
-## Example
+---
 
-Create `main.go`:
+## Essential Go Commands
+
+Here are the most common commands you'll use:
+
+- **`go mod tidy`**: Cleans up your `go.mod` file, adding any missing dependencies and removing unused ones. Run this often!
+- **`go run .`**: Compiles and runs your project in one step. Great for quick development.
+- **`go build`**: Compiles your code into an executable binary file you can distribute.
+- **`go test ./...`**: Runs all the tests in your project.
+
+---
+
+## Your First \"Hello World\"
+
+Let's verify everything is working. Create a file named `main.go`:
+
 ```go
 package main
 
 import \"fmt\"
 
 func main() {
-    fmt.Println(\"Hello, Go modules!\")
+    fmt.Println(\"Hello, your Go environment is ready!\")
 }
 ```
 
-Run: `mise run go run .`
+Now, run it using mise:
 
-## Next
+```bash
+mise run go run .
+```
 
-[03-package-organization.md &rarr;](../03-package-organization.md)
+If you see \"Hello, your Go environment is ready!\", congratulations! You've successfully set up your workspace.
+
+## Next Step
+
+Now that our environment is working, let's learn how to handle errors safely.
+
+[03-error-handling.md &rarr;](./03-error-handling.md)
 
 [&larr; Back to [TOC](../README.md#table-of-contents)]
