@@ -2,7 +2,7 @@
 
 In this chapter, we'll learn how to automate our testing and building process using **CI/CD**.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [11-static-analysis-linting.md](./11-static-analysis-linting.md)] | [&rarr; [13-advanced-topics.md](./13-advanced-topics.md)]
+[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [11-static-analysis-linting.md](./11-static-analysis-linting.md)] | [&rarr; [13-llms.md](./13-llms.md)]
 
 ## What is CI/CD?
 
@@ -67,8 +67,8 @@ One of the biggest problems in software development is when code works on your l
 
 ## Next Step
 
-We've covered a lot! Let's take a quick look at some more advanced topics you'll encounter as you grow as a Go developer.
+Now that our code is clean and tested, let's learn how to use AI to help us write even better code.
 
-[13-advanced-topics.md &rarr;](./13-advanced-topics.md)
+[13-llms.md &rarr;](./13-llms.md)
 
 [&larr; Back to [TOC](../README.md#table-of-contents)]

@@ -25,8 +25,9 @@ Building professional software is about more than just writing code. It's about 
 10. [**Unit Testing**](./10-unit-testing.md) - Ensuring your code works with `go test` and `testify`.
 11. [**Static Analysis & Linting**](./11-static-analysis-linting.md) - Keeping your code clean and bug-free.
 12. [**CI/CD**](./12-ci-cd.md) - Automating everything with GitHub Actions.
-13. [**Advanced Topics**](./13-advanced-topics.md) - Context, Dependency Injection, and Docker.
-14. [**Stitching It All Together**](./14-stitching-it-together.md) - Your final professional checklist.
+13. [**AI-Powered Development (LLMs)**](./13-llms.md) - Using AI to write better Go code.
+14. [**Advanced Topics**](./14-advanced-topics.md) - Context, Dependency Injection, and Docker.
+15. [**Stitching It All Together**](./15-stitching-it-together.md) - Your final professional checklist.
 
 ---
 

@@ -1,8 +1,9 @@
-# 14. Stitching It All Together
+# 15. Stitching It All Together
 
 You've made it! In this final chapter, we'll summarize everything we've learned into a clear, step-by-step workflow for building professional Go applications.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [13-advanced-topics.md](./13-advanced-topics.md)]
+[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [14-advanced-topics.md](./14-advanced-topics.md)]
+
 
 ## The New Project Checklist
 

@@ -1,8 +1,9 @@
-# 13. Advanced Topics (What's Next?)
+# 14. Advanced Topics (What's Next?)
 
 Congratulations on making it this far! You've learned the foundations of a professional Go environment. In this chapter, we'll briefly introduce some advanced topics you'll encounter as you continue your journey.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [12-ci-cd.md](./12-ci-cd.md)] | [&rarr; [14-stitching-it-together.md](./14-stitching-it-together.md)]
+[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [13-llms.md](./13-llms.md)] | [&rarr; [15-stitching-it-together.md](./15-stitching-it-together.md)]
+
 
 ## 1. Modules & Versioning
 
@@ -58,6 +59,7 @@ CMD [\"./heroes\"]
 
 Let's wrap up by putting everything we've learned together into a single project lifecycle!
 
-[14-stitching-it-together.md &rarr;](./14-stitching-it-together.md)
+[15-stitching-it-together.md &rarr;](./15-stitching-it-together.md)
+
 
 [&larr; Back to [TOC](../README.md#table-of-contents)]

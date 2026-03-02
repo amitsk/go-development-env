@@ -98,6 +98,13 @@ chapters. Create navigation links in each document.
     **** Short explainer about GitHub Actions; sample workflow building,
          testing, linting, releasing a module.
 
+*** AI-Powered Development (LLMs)
+    **** Introduction to LLMs in coding (GPT-4, Claude).
+    **** Benefits: Error handling, boilerplate, unit tests.
+    **** Tools: Cursor, Claude Code, Copilot.
+    **** Best practices: Verification, context, learning with AI.
+    **** Security note.
+
 *** Advanced topics (glossed)
     **** Modules & versioning (`go mod tidy`, `replace`, semantic import
          versioning).
