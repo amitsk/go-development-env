@@ -1,0 +1,7 @@
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  staticcheck:
+    checks: [\"all\",\"-SA1019\"]
+issues:
+  exclude-use-default: false

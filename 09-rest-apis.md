@@ -68,6 +68,43 @@ func main() {
 }
 ```
 
+## JSON Parsing (Under the Hood)
+
+Gin’s `ShouldBindJSON` uses Go’s **stdlib `encoding/json`**—no external deps!
+
+### Basics
+```go
+import \"encoding/json\"
+
+// Marshal (struct → JSON)
+hero := models.Hero{ID:1, Name:\"Superman\"}
+bytes, err := json.Marshal(hero)  // []byte
+// Output: {\"id\":1,\"name\":\"Superman\"}
+
+// Unmarshal (JSON → struct)
+var h models.Hero
+err = json.Unmarshal(bytes, &h)  // Note &h!
+```
+
+### Struct Tags
+Control fields:
+```go
+type Hero struct {
+    ID   int    `json:\"id\"`
+    Name string `json:\"name,omitempty\"`  // Skip if empty
+    Secret bool `json:\"-\"`  // Ignore
+}
+```
+
+**Pitfalls**:
+- Always `&struct` for unmarshal.
+- Slices/maps need pointers if dynamic.
+- Custom error: `json: cannot unmarshal ...`
+
+**Exercise**: Manual POST /heroes without Gin binding—parse raw body.
+
+Gin/Echo wrap this safely!
+
 ---
 
 ## Key Concepts

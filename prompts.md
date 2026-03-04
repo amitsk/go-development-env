@@ -29,16 +29,21 @@ chapters. Create navigation links in each document.
 
 *** Error handling (The Go Way)
     **** Explain the \"tuple\" return pattern (value, error).
-    **** Why Go doesn't use try/catch like other languages.
+    **** Why Go doesn't use try/catch like other languages—benefits for sophomores (explicit, composable).
     **** Beginner-friendly explanation of checking for `nil`.
-    **** Standard pattern for bubbling up errors.
+    **** Standard pattern for bubbling up errors: if err != nil { return err }
+    **** `errors.Is`, `errors.As`, `fmt.Errorf` wrapping.
+    **** Comparison table: Go errors vs exceptions (Java/Python).
+    **** Exercises: Refactor fmt.Println error ignoring.
 
 *** Package organization
     **** Idiomatic layout (`cmd/`, `pkg/`, `internal/`, `api/`, `configs/`,
          `scripts/`, `test/`).
-    **** How to structure for libraries vs applications.
-    **** Naming conventions, keeping packages small and focused.
-    **** Example: simple “heroes” service with handlers, models, store layers.
+    **** How to structure for libraries vs applications—pros/cons.
+    **** Naming conventions, keeping packages small and focused (one concern).
+    **** Example: simple “heroes” service with handlers, models, store layers—full dir tree + main.go snippet.
+    **** Common pitfalls: cyclic imports, god packages.
+    **** Exercise: Restructure flat project into layers.
 
 *** Makefile
     **** Why a Makefile is useful even with `go` commands.

@@ -31,14 +31,24 @@ Building professional software is about more than just writing code. It's about 
 
 ---
 
+## Quick Setup Script
+
+```bash
+curl -fsSL https://mise.jdx.dev/install.sh | sh
+mise use --global go@latest
+code .  # Open in VS Code
+```
+
+**VS Code Extensions** (install via `Ctrl+Shift+X`):
+- Go (golang.Go)
+- GitLens
+- Error Lens
+- Prettier
+
 ## Getting Started
 
-To get the most out of this tutorial, make sure you have the following installed:
+[...existing prereqs...]
 
-- [**VS Code**](https://code.visualstudio.com/) with the [Go Extension](https://marketplace.visualstudio.com/items?itemName=golang.Go).
-- [**mise**](https://mise.jdx.dev/): A universal tool manager.
-- [**Git**](https://git-scm.com/): For version control.
+**Sophomore Tip**: Follow along in a new folder—type every command!
 
-Ready? Let's dive in!
-
-[**Start Chapter 1: Introduction &rarr;**](./01-introduction.md)
+[**Start Chapter 1 &rarr;**](./01-introduction.md)

@@ -55,6 +55,57 @@ COPY --from=builder /app/heroes /heroes
 CMD [\"./heroes\"]
 ```
 
+## Go Routines & Channels (Concurrency Basics)
+
+Go's killer feature: **goroutines** (cheap threads, ~2KB stack) + **channels** (typed pipes).
+
+**Spawn**: `go func() { println(\"hello\") }()`
+
+**Sync**: `var wg sync.WaitGroup; wg.Add(1); go func() { defer wg.Done(); ... }(); wg.Wait()`
+
+**Ping-Pong Classic** ([Go Tour](https://go.dev/tour/concurrency/2)):
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	ball := make(chan string)
+	go player("ping", ball)
+	go player("pong", ball)
+
+	ball <- "Serve!"
+	time.Sleep(time.Second)
+	<-ball
+}
+
+func player(name string, ch chan string) {
+	for {
+		msg := <-ch
+		fmt.Println(name, msg)
+		time.Sleep(100 * time.Millisecond)
+		ch <- fmt.Sprintf("%s: ball!", name)
+	}
+}
+```
+
+**Output**:
+```
+ping Serve!
+pong ping: ball!
+ping pong: ball!
+...
+```
+
+**Pitfalls**: Data races (`go test -race`), channel deadlocks.
+
+**Exercise**: Add counter; stop after 10 pings.
+
+Docs: [Concurrency Patterns](https://go.dev/blog/pipelines), [Effective Go](https://go.dev/doc/effective_go#goroutines).
+
 ## Next Step
 
 Let's wrap up by putting everything we've learned together into a single project lifecycle!

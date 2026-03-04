@@ -1,0 +1,7 @@
+# Full Makefile from Ch.05
+GO := $(shell which go)
+.PHONY: all build test lint fmt clean
+all: deps fmt lint test build
+build:
+\tmise run go build -o bin/heroes ./cmd/heroes
+# ... full from earlier

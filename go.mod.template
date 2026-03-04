@@ -1,0 +1,10 @@
+module github.com/yourusername/heroes-api
+
+go 1.23
+
+require (
+\tgithub.com/gin-gonic/gin v1.10.0
+\tgithub.com/spf13/viper v1.19.0
+\tgorm.io/gorm v1.27.1
+\t// etc.
+)
