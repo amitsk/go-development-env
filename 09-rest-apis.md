@@ -1,143 +1,166 @@
 # 09. Building REST APIs
 
-In this chapter, we'll learn how to expose our application's functionality to the world using a **REST API**.
+In this chapter we expose the application over HTTP.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [08-database-access.md](./08-database-access.md)] | [&rarr; [10-unit-testing.md](./10-unit-testing.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [08-database-access.md](./08-database-access.md)] | [→ [10-unit-testing.md](./10-unit-testing.md)]
 
 ## What is a REST API?
 
-A **REST API** is a way for two computers to talk to each other over the internet using HTTP (the same protocol your web browser uses). 
+A **REST API** is two programs talking over HTTP — the same protocol your browser uses.
 
-- **Resources**: Things your API manages (like \"Heroes\").
-- **Methods**: Actions you can perform on those things:
-    - `GET`: Retrieve information (e.g., get a list of heroes).
-    - `POST`: Create something new (e.g., add a new hero).
-    - `PUT` / `PATCH`: Update something existing.
-    - `DELETE`: Remove something.
+- **Resources**: the things you manage (`/heroes`).
+- **Methods**:
+  - `GET` — read
+  - `POST` — create
+  - `PUT` / `PATCH` — update
+  - `DELETE` — remove
 
 ---
 
-## Introducing Gin
+## Start with `net/http` (Go 1.22+)
 
-[**Gin**](https://github.com/gin-gonic/gin) is the most popular HTTP framework for Go. It's incredibly fast and easy to use.
+Since **Go 1.22**, the standard library `ServeMux` understands methods and path parameters. For many services you do not need a framework:
 
-### Example: A Basic Heroes API
+```go
+mux := http.NewServeMux()
+
+mux.HandleFunc("GET /heroes", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    _ = json.NewEncoder(w).Encode(map[string]any{
+        "heroes": []string{"Superman", "Batman", "Wonder Woman"},
+    })
+})
+
+mux.HandleFunc("GET /heroes/{id}", func(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    fmt.Fprintln(w, id)
+})
+
+server := &http.Server{Addr: ":8080", Handler: mux}
+log.Fatal(server.ListenAndServe())
+```
+
+Learn this first. Frameworks are thin wrappers around the same ideas. [`heroes-service/internal/api`](./heroes-service/internal/api/server.go) is this style with create/list/get and tests.
+
+---
+
+## Gin, when you want batteries included
+
+[**Gin**](https://github.com/gin-gonic/gin) (v1.12 as of 2026) is still the most common third-party HTTP framework: routing, JSON binding, validation tags, and middleware in a small API.
 
 ```go
 package main
 
 import (
-    \"github.com/gin-gonic/gin\"
-    \"net/http\"
+    "net/http"
+
+    "github.com/gin-gonic/gin"
 )
 
 type CreateHeroRequest struct {
-    Name string `json:\"name\" binding:\"required\"`
+    Name string `json:"name" binding:"required"`
 }
 
 func main() {
-    // 1. Create a default Gin router
     r := gin.Default()
 
-    // 2. Define a POST endpoint to create a hero
-    r.POST(\"/heroes\", func(c *gin.Context) {
+    r.POST("/heroes", func(c *gin.Context) {
         var req CreateHeroRequest
-        
-        // Bind the JSON request body to our struct
         if err := c.ShouldBindJSON(&req); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{\"error\": err.Error()})
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
             return
         }
 
-        // Return a 201 Created status and the new hero
         c.JSON(http.StatusCreated, gin.H{
-            \"id\": 1,
-            \"name\": req.Name,
+            "id":   1,
+            "name": req.Name,
         })
     })
 
-    // 3. Define a GET endpoint to list heroes
-    r.GET(\"/heroes\", func(c *gin.Context) {
+    r.GET("/heroes", func(c *gin.Context) {
         c.JSON(http.StatusOK, gin.H{
-            \"heroes\": []string{\"Superman\", \"Batman\", \"Wonder Woman\"},
+            "heroes": []string{"Superman", "Batman", "Wonder Woman"},
         })
     })
 
-    // 4. Start the server on port 8080
-    r.Run(\":8080\")
+    if err := r.Run(":8080"); err != nil {
+        panic(err)
+    }
 }
 ```
 
-## JSON Parsing (Under the Hood)
+Install it in the module:
 
-Gin’s `ShouldBindJSON` uses Go’s **stdlib `encoding/json`**—no external deps!
-
-### Basics
-```go
-import \"encoding/json\"
-
-// Marshal (struct → JSON)
-hero := models.Hero{ID:1, Name:\"Superman\"}
-bytes, err := json.Marshal(hero)  // []byte
-// Output: {\"id\":1,\"name\":\"Superman\"}
-
-// Unmarshal (JSON → struct)
-var h models.Hero
-err = json.Unmarshal(bytes, &h)  // Note &h!
+```bash
+go get github.com/gin-gonic/gin@v1.12.0
 ```
 
-### Struct Tags
-Control fields:
+---
+
+## JSON with the standard library
+
+Gin's `ShouldBindJSON` uses `encoding/json`. You should know the stdlib API:
+
+```go
+hero := models.Hero{ID: 1, Name: "Superman"}
+bytes, err := json.Marshal(hero) // {"id":1,"name":"Superman"}
+
+var h models.Hero
+err = json.Unmarshal(bytes, &h) // pass a pointer
+```
+
+Struct tags:
+
 ```go
 type Hero struct {
-    ID   int    `json:\"id\"`
-    Name string `json:\"name,omitempty\"`  // Skip if empty
-    Secret bool `json:\"-\"`  // Ignore
+    ID     int    `json:"id"`
+    Name   string `json:"name,omitempty"`
+    Secret bool   `json:"-"`
 }
 ```
 
-**Pitfalls**:
-- Always `&struct` for unmarshal.
-- Slices/maps need pointers if dynamic.
-- Custom error: `json: cannot unmarshal ...`
+Pitfalls: unmarshal into a pointer; `json.NewDecoder(r.Body).Decode` is better for HTTP bodies than `io.ReadAll` + `Unmarshal` (it streams and enforces one value).
 
-**Exercise**: Manual POST /heroes without Gin binding—parse raw body.
-
-Gin/Echo wrap this safely!
+Go 1.26 also lets you write `Age: new(yearsSince(born))` when a JSON field is a pointer — handy for optional values.
 
 ---
 
-## Key Concepts
+## Key HTTP ideas
 
-### 1. Context (`gin.Context`)
-The `c *gin.Context` is the most important part of Gin. It contains everything about the request (headers, body, parameters) and allows you to send a response.
+### Context
 
-### 2. Status Codes
-Always return the correct HTTP status code:
-- `200 OK`: Success.
-- `201 Created`: Successfully created a new resource.
-- `400 Bad Request`: The client sent invalid data.
-- `404 Not Found`: The resource doesn't exist.
-- `500 Internal Server Error`: Something went wrong on your side.
+In Gin, `c *gin.Context` holds the request and lets you write the response. The standard library uses `http.ResponseWriter`, `*http.Request`, and `r.Context()` (cancellation when the client hangs up). Prefer `r.Context()` for downstream calls.
 
-### 3. Middleware
-Middleware are functions that run before or after your main logic. They are great for things like:
-- **Logging**: Recording every request.
-- **Authentication**: Making sure the user is logged in.
-- **Recovery**: Catching crashes so your whole server doesn't go down.
+### Status codes
+
+- `200 OK` — success
+- `201 Created` — a new resource exists
+- `400 Bad Request` — the client sent junk
+- `404 Not Found`
+- `500 Internal Server Error` — *your* bug; log it, do not leak internals to the client
+
+### Middleware
+
+Functions that wrap every request: request IDs, structured logs, auth, panic recovery. Gin's `gin.Default()` already installs logger + recovery. In stdlib, wrap `http.Handler`.
+
+### Graceful shutdown
+
+Production servers should handle `SIGINT` / `SIGTERM` and call `server.Shutdown(ctx)` so in-flight requests finish. See Chapter 14.
 
 ---
 
-## Alternatives: Echo
+## Alternatives
 
-[**Echo**](https://echo.labstack.com/) is another fantastic framework. It has a very similar API to Gin and is also extremely fast. Many developers prefer Echo for its cleaner middleware system and built-in support for WebSockets.
+[**Echo**](https://echo.labstack.com/) and [**chi**](https://github.com/go-chi/chi) are the usual other choices. chi is a thin router that feels like stdlib. Echo is closer to Gin.
 
-**Our Recommendation**: Start with **Gin**. It has the largest community and most examples online.
+**Recommendation:** learn `net/http` first, then use **Gin** or **chi** if you want binding and a middleware ecosystem. Generate OpenAPI later with [swag](https://github.com/swaggo/swag) or an API-first tool — not on day one.
 
-## Next Step
+Handler tests belong with Chapter 10 (`net/http/httptest`).
 
-Now that we've built our API, let's learn how to make sure it actually works using tests.
+## Next step
 
-[10-unit-testing.md &rarr;](./10-unit-testing.md)
+Let's make sure the API actually works.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+[10-unit-testing.md →](./10-unit-testing.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

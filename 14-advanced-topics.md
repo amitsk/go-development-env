@@ -1,116 +1,149 @@
-# 14. Advanced Topics (What's Next?)
+# 14. Advanced Topics
 
-Congratulations on making it this far! You've learned the foundations of a professional Go environment. In this chapter, we'll briefly introduce some advanced topics you'll encounter as you continue your journey.
+You have the foundations of a professional Go environment. This chapter is a map of what comes next — not a full course.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [13-llms.md](./13-llms.md)] | [&rarr; [15-stitching-it-together.md](./15-stitching-it-together.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [13-llms.md](./13-llms.md)] | [→ [15-stitching-it-together.md](./15-stitching-it-together.md)]
 
+## 1. Modules, versions, and `go tool`
 
-## 1. Modules & Versioning
+Release libraries with [semantic versioning](https://semver.org/) and Git tags (`v1.2.3`). A breaking change to an already-released `v1` module needs a `/v2` import path. See [Module version numbering](https://go.dev/doc/modules/version-numbers).
 
-As your project grows, you might need to release specific versions (like `v1.0.0`). Go uses **Semantic Versioning (SemVer)** to manage this. You'll learn how to use `git tags` to create releases and how to manage multiple versions of your library using major version suffixes (like `/v2`).
+Since **Go 1.24**, executable tools belong in `go.mod` with a `tool` directive — no more `tools.go` blank imports:
 
----
-
-## 2. Using `context.Context`
-
-In Go, almost every function that performs an operation like a database query or a network request should take a `context.Context` as its first argument.
-
-```go
-func FetchData(ctx context.Context, id int) (*Data, error)
+```bash
+go get -tool golang.org/x/vuln/cmd/govulncheck
+go get -tool golang.org/x/tools/cmd/stringer
+go tool govulncheck ./...
 ```
 
-**Why?** Because it allows you to cancel operations if they take too long or if the user cancels their request. This keeps your application fast and prevents it from wasting resources.
+For a **multi-module repo**, look at [`go work`](https://go.dev/ref/mod#workspaces) (`go.work`). You do not need it for the single-module heroes service.
 
 ---
 
-## 3. Dependency Injection (DI)
+## 2. `context.Context`
 
-**Dependency Injection** sounds complicated, but it's just a fancy way of saying \"give a function what it needs rather than letting it create it.\" For example, instead of a service creating its own database connection, you \"inject\" the connection into the service when you create it.
+Any function that waits — HTTP, database, gRPC, a sleep — should take `context.Context` as its **first** argument.
 
-Tools like [**Wire**](https://github.com/google/wire) or [**Uber-fx**](https://github.com/uber-go/fx) can help you manage this automatically as your project grows.
+```go
+func FetchHero(ctx context.Context, id int) (*Hero, error) {
+    row := db.QueryRowContext(ctx, `SELECT id, name FROM heroes WHERE id = $1`, id)
+    // ...
+}
+```
+
+The context carries deadlines and cancellation. When the client hangs up, `r.Context()` is cancelled and a well-behaved query stops. Do not store a context on a struct; pass it down the call.
+
+In `main`, pair the server with a signal:
+
+```go
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+
+go func() {
+    <-ctx.Done()
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+    _ = server.Shutdown(shutdownCtx)
+}()
+```
 
 ---
 
-## 4. Building CLI Tools
+## 3. Dependency injection (without a framework)
 
-Go is the #1 language for building command-line tools (like `docker`, `kubernetes`, or even `mise`!). If you want to build your own, you'll likely use [**Cobra**](https://github.com/spf13/cobra). It makes it easy to add flags, commands, and help text to your program.
+"Dependency injection" means: **pass collaborators in**, do not construct them deep in the stack.
+
+```go
+type API struct {
+    store  store.Store
+    logger *slog.Logger
+}
+
+func NewAPI(s store.Store, logger *slog.Logger) *API {
+    return &API{store: s, logger: logger}
+}
+```
+
+`main` is the only place that opens the database and builds the graph. Tests pass a fake `store.Store`.
+
+Frameworks such as [Uber fx](https://github.com/uber-go/fx) help in very large graphs. [Google Wire](https://github.com/google/wire) is in maintenance mode — do not start a new project on it. Most services never outgrow constructors.
 
 ---
 
-## 5. Containers & Docker
+## 4. CLIs
 
-When you're ready to deploy your Go app, you'll often use [**Docker**](https://www.docker.com/). Docker allows you to \"package\" your application with everything it needs (libraries, config, etc.) into a single **container** that runs the same on any server.
+Go is a default choice for command-line tools. [**Cobra**](https://github.com/spf13/cobra) and [**urfave/cli**](https://github.com/urfave/cli) handle flags, subcommands, and help text. For a single command, `flag` in the standard library is enough.
 
-### Example: A Go Dockerfile
+---
+
+## 5. Containers
+
+[`heroes-service/Dockerfile`](./heroes-service/Dockerfile) is this image applied to the sample.
+
+A small, reproducible image:
+
 ```dockerfile
-# 1. Build the app
-FROM golang:1.26-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o heroes ./cmd/heroes
+# syntax=docker/dockerfile:1
 
-# 2. Run the app in a tiny, secure container
-FROM alpine:latest
-COPY --from=builder /app/heroes /heroes
-CMD [\"./heroes\"]
+FROM golang:1.26-alpine AS builder
+WORKDIR /src
+RUN apk add --no-cache ca-certificates
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/heroes ./cmd/heroes
+
+FROM alpine:3.21
+RUN adduser -D -H -u 65532 app
+COPY --from=builder /out/heroes /heroes
+USER app
+EXPOSE 8080
+ENTRYPOINT ["/heroes"]
 ```
 
-## Go Routines & Channels (Concurrency Basics)
+Why the extra pieces:
 
-Go's killer feature: **goroutines** (cheap threads, ~2KB stack) + **channels** (typed pipes).
+- **`go mod download` before `COPY .`** — dependency layers stay cached when only app code changes.
+- **`CGO_ENABLED=0`** — a static binary, no glibc surprises.
+- **non-root `USER`** — the process cannot write wherever it wants if the container is broken into.
 
-**Spawn**: `go func() { println(\"hello\") }()`
+For a tighter runtime, look at [distroless](https://github.com/GoogleContainerTools/distroless) `static` images. Kubernetes is a deployment *platform*; learn Docker (or another OCI builder) first.
 
-**Sync**: `var wg sync.WaitGroup; wg.Add(1); go func() { defer wg.Done(); ... }(); wg.Wait()`
+---
 
-**Ping-Pong Classic** ([Go Tour](https://go.dev/tour/concurrency/2)):
+## 6. Goroutines and channels
+
+Go's concurrency primitives are cheap goroutines and typed channels. The [Tour](https://go.dev/tour/concurrency/1) is still the right first hour.
+
 ```go
-package main
-
-import (
-	"fmt"
-	"time"
-)
-
 func main() {
-	ball := make(chan string)
-	go player("ping", ball)
-	go player("pong", ball)
+    ball := make(chan string)
+    go player("ping", ball)
+    go player("pong", ball)
 
-	ball <- "Serve!"
-	time.Sleep(time.Second)
-	<-ball
+    ball <- "Serve!"
+    time.Sleep(time.Second)
+    <-ball
 }
 
 func player(name string, ch chan string) {
-	for {
-		msg := <-ch
-		fmt.Println(name, msg)
-		time.Sleep(100 * time.Millisecond)
-		ch <- fmt.Sprintf("%s: ball!", name)
-	}
+    for {
+        msg := <-ch
+        fmt.Println(name, msg)
+        time.Sleep(100 * time.Millisecond)
+        ch <- fmt.Sprintf("%s: ball!", name)
+    }
 }
 ```
 
-**Output**:
-```
-ping Serve!
-pong ping: ball!
-ping pong: ball!
-...
-```
+Always run `go test -race` once you share memory across goroutines. Prefer communicating over a channel, or protecting the memory with `sync.Mutex`, over "I think this is safe."
 
-**Pitfalls**: Data races (`go test -race`), channel deadlocks.
+Further reading: [Go Concurrency Patterns](https://go.dev/blog/pipelines), [Effective Go — concurrency](https://go.dev/doc/effective_go#concurrency).
 
-**Exercise**: Add counter; stop after 10 pings.
+## Next step
 
-Docs: [Concurrency Patterns](https://go.dev/blog/pipelines), [Effective Go](https://go.dev/doc/effective_go#goroutines).
+Put the pieces into one new-project checklist.
 
-## Next Step
+[15-stitching-it-together.md →](./15-stitching-it-together.md)
 
-Let's wrap up by putting everything we've learned together into a single project lifecycle!
-
-[15-stitching-it-together.md &rarr;](./15-stitching-it-together.md)
-
-
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+[← Back to [TOC](README.md#table-of-contents)]

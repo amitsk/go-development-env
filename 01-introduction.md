@@ -1,51 +1,78 @@
 # 01. Introduction
 
-Welcome to the Go Development Environment tutorial! This guide is designed for students and developers who have some experience writing code but are new to the professional tooling and workflows used in the Go ecosystem.
+Welcome to the Go Development Environment tutorial. This guide is for students and developers who can already write some code but are new to the professional tooling and workflows used in the Go ecosystem.
 
-[&larr; Back to [README](../README.md)]
+[← Back to [README](README.md)]
 
-## Goal of this Tutorial
+## Goal of this tutorial
 
-The goal is to move beyond just \"writing code that runs\" and start building **production-ready** applications. We will focus on the environment, tools, and processes that help professional engineers maintain high-quality code.
+The goal is to move beyond "writing code that runs" and start building **production-ready** applications. We focus on the environment, tools, and processes that help professional engineers keep code high quality.
 
-**Important:** This is NOT a tutorial on how to program in Go itself. If you are new to the Go language, we highly recommend starting with these excellent resources:
-- [A Tour of Go](https://tour.golang.org/): An interactive introduction to Go's syntax and features.
-- [Effective Go](https://go.dev/doc/effective_go): Essential reading for writing idiomatic Go code.
+**This is not a tutorial on how to program in Go.** If you are new to the language, start here:
 
-## Why Professional Tooling Matters?
+- [A Tour of Go](https://go.dev/tour/) — interactive introduction to syntax and features
+- [Effective Go](https://go.dev/doc/effective_go) — idiomatic style
+- [How to Write Go Code](https://go.dev/doc/code) — packages, modules, and the `go` command
+- [Go by Example](https://gobyexample.com/) — short annotated programs
 
-In a professional setting, we care about more than just the logic of the code. We care about:
+## Why professional tooling matters
 
-- **Version Control (Git)**: Tracking changes so you can collaborate with others and \"undo\" mistakes safely.
-- **Linting & Formatting**: Ensuring your code is clean, consistent, and free of common errors before you even run it.
-- **Unit Testing**: Writing small tests for your logic to make sure it works as expected and stays working as you change things.
-- **CI/CD (Continuous Integration/Continuous Deployment)**: Automating the process of testing and building your app every time you save your work.
+In a professional setting we care about more than the logic of the code:
 
-## Tools We Will Use
+- **Version control (Git)** — track changes, collaborate, and undo mistakes safely.
+- **Formatting** — one official style (`gofmt`) so reviews focus on behavior, not braces.
+- **Linting & vetting** — catch ignored errors, dead code, and other bugs before you run the program.
+- **Unit testing** — small tests so behavior stays correct as you change things.
+- **CI/CD** — automatically format-check, test, and build on every push.
 
-We've selected a modern stack of tools that are popular in the industry today.
+## Tools we will use
 
-### 1. Mise (Version & Tool Management)
+We've selected a modern stack that is popular in industry in 2026.
 
-Managing different versions of Go (or other languages) can be a headache. [**Mise**](https://github.com/jdx/mise) (formerly `rtx`) is a tool that makes this easy. It allows you to define which version of Go your project needs in a simple configuration file.
+### 1. Mise (version and tool management)
 
-**Installation:**
-- **macOS**: `brew install mise`
-- **Windows**: `winget install jdx.mise`
-- **Linux**: Follow the instructions at [mise.jdx.dev](https://mise.jdx.dev/getting-started.html)
+Managing different versions of Go (or other languages) by hand is a headache. [**mise**](https://mise.jdx.dev/) (formerly `rtx`) lets you pin the Go version — and other tools like `golangci-lint` — in a `mise.toml` file that lives with the project.
 
-### 2. VS Code (Code Editor)
+**Installation** (see the [official install guide](https://mise.jdx.dev/installing-mise.html) for more options):
 
-We recommend [**Visual Studio Code**](https://code.visualstudio.com/) for this tutorial. It has excellent support for Go through the [Official Go Extension](https://marketplace.visualstudio.com/items?itemName=golang.Go).
+```bash
+# Recommended on macOS and Linux
+curl https://mise.run | sh
 
-### 3. A Note on Alternatives
+# Then activate in your shell (bash shown; use zsh or fish if that is your shell)
+echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+```
 
-The tools we use here—like `mise`, `golangci-lint`, and `testify`—are solid, modern choices. However, the Go ecosystem is rich with alternatives. Once you're comfortable with these, you might explore others like `task` (a Makefile replacement), `staticcheck`, or `asdf`.
+- **macOS (Homebrew):** `brew install mise`
+- **Windows:** `winget install jdx.mise`
+- **Linux packages:** apt/yum/nix — see [installing mise](https://mise.jdx.dev/installing-mise.html)
 
-## Next Step
+Activation is important. Without it, `go` on your `PATH` may be a system package that is years old. After activation, `which go` should point at a mise-managed binary.
 
-Now that we have the \"why\" and \"what\" covered, let's set up our first Go workspace!
+### 2. VS Code and `gopls`
 
-[02-go-workspace-modules.md &rarr;](./02-go-workspace-modules.md)
+We recommend [**Visual Studio Code**](https://code.visualstudio.com/) with the [official Go extension](https://marketplace.visualstudio.com/items?itemName=golang.Go). The extension uses **`gopls`**, the official Go language server, for completion, jump-to-definition, and format-on-save.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+The first time you open a `.go` file, the extension will offer to install extra tools (`gopls`, `goimports`, `staticcheck`, …). Accept that prompt.
+
+You do **not** need Prettier for Go. Use `gofmt` / `goimports` through the Go extension.
+
+### 3. A note on alternatives
+
+The tools here — `mise`, `golangci-lint`, `testify` — are solid, modern choices. The Go ecosystem has many others. Once you are comfortable, you might explore:
+
+- **Task runners:** [Task](https://taskfile.dev/) (`Taskfile.yml`) instead of Make, or mise's own `[tasks]`
+- **Version managers:** `asdf` (mise is a compatible successor), or the official [go.dev/dl](https://go.dev/dl/) installers plus the `toolchain` line in `go.mod`
+- **Linters:** `staticcheck` on its own, or `go vet` + `govulncheck` if you want a smaller set
+- **Editors:** GoLand, Neovim with `gopls`, Zed, or Cursor (VS Code–compatible)
+
+Pick what your team already uses. Consistency beats novelty.
+
+## Next step
+
+Now that we have the "why" and "what", let's set up a Go workspace.
+
+[02-go-workspace-modules.md →](./02-go-workspace-modules.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

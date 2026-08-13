@@ -1,100 +1,132 @@
 # 07. Configuration Management
 
-In this chapter, we'll learn how to handle configuration for our application using **Viper**.
+In this chapter we keep settings out of the source code.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [06-logging.md](./06-logging.md)] | [&rarr; [08-database-access.md](./08-database-access.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [06-logging.md](./06-logging.md)] | [→ [08-database-access.md](./08-database-access.md)]
 
-## Why Use External Configuration?
+## Why external configuration?
 
-When you're building a professional application, you'll need it to run in different environments: your laptop (Development), a testing server (Staging), and the real world (Production).
+A professional app runs in more than one place: your laptop (development), a shared test environment (staging), and production.
 
-The **12-Factor App** methodology states that you should never hardcode configuration values (like database passwords or API keys) in your code. Instead, you should keep them separate so you can:
+The [Twelve-Factor App](https://12factor.net/config) rule is: **never hardcode** config (ports, database URLs, API keys). Keep it outside the binary so you can:
 
-1. **Keep Secrets Safe**: Don't commit passwords to your GitHub repository!
-2. **Change Behavior Without Rebuilding**: Change the log level or database URL without having to re-compile your code.
-3. **Be Environment-Agnostic**: Use a different database on your laptop than in production.
-
----
-
-## Introducing Viper
-
-[**Viper**](https://github.com/spf13/viper) is the most popular configuration library for Go. It can read configuration from:
-- Files (JSON, TOML, YAML, HCL, envfile)
-- Environment variables
-- Command-line flags
-- Remote configuration systems (like Consul or Etcd)
+1. **Keep secrets out of Git** — no passwords in the repo.
+2. **Change behavior without rebuilding** — flip the log level or database URL.
+3. **Stay environment-agnostic** — a different database on your laptop than in production.
 
 ---
 
-## Example: Using Viper
+## Do you need a library?
 
-Let's see how we can use Viper to load configuration into a Go `struct`.
-
-### 1. Define Your Configuration Struct
-
-We use \"tags\" (the text in backticks) to tell Viper how to map the configuration file to our struct.
+Many Go services only need environment variables. The standard library is enough:
 
 ```go
-type Config struct {
-    Port     int    `mapstructure:\"port\"`
-    Database string `mapstructure:\"database_url\"`
-    LogLevel string `mapstructure:\"log_level\"`
+port := os.Getenv("PORT")
+if port == "" {
+    port = "8080"
 }
 ```
 
-### 2. Load the Configuration
+Small typed helpers such as [caarlos0/env](https://github.com/caarlos0/env) or [kelseyhightower/envconfig](https://github.com/kelseyhightower/envconfig) stay close to that idea.
+
+Use a fuller library when you genuinely need files + env + flags merged together. That is where Viper earns its keep.
+
+[`heroes-service/internal/config`](./heroes-service/internal/config/config.go) is the env-only path: `PORT`, `LOG_LEVEL`, `PPROF`.
+
+---
+
+## Viper
+
+[**Viper**](https://github.com/spf13/viper) can read:
+
+- Files (YAML, JSON, TOML, envfile, …)
+- Environment variables
+- Command-line flags
+- Remote sources (Consul, etcd) — skip these until you need them
+
+### 1. Define a config struct
+
+```go
+type Config struct {
+    Port     int    `mapstructure:"port"`
+    Database string `mapstructure:"database_url"`
+    LogLevel string `mapstructure:"log_level"`
+}
+```
+
+### 2. Load it
 
 ```go
 package main
 
 import (
-    \"fmt\"
-    \"github.com/spf13/viper\"
+    "fmt"
+    "strings"
+
+    "github.com/spf13/viper"
 )
 
 func LoadConfig() (*Config, error) {
-    // Tell Viper where to look for the file
-    viper.SetConfigName(\"config\") // Name of the file (without extension)
-    viper.SetConfigType(\"yaml\")   // Extension of the file
-    viper.AddConfigPath(\".\")      // Look in the current directory
+    viper.SetConfigName("config")
+    viper.SetConfigType("yaml")
+    viper.AddConfigPath(".")
+    viper.AddConfigPath("./configs")
 
-    // Automatically read from environment variables too!
-    // For example, DATABASE_URL will override the value in the file.
+    viper.SetDefault("port", 8080)
+    viper.SetDefault("log_level", "info")
+
+    // PORT → port, DATABASE_URL → database_url
+    viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
     viper.AutomaticEnv()
 
+    // AutomaticEnv does not invent names. Bind the ones you care about:
+    _ = viper.BindEnv("database_url", "DATABASE_URL")
+    _ = viper.BindEnv("port", "PORT")
+    _ = viper.BindEnv("log_level", "LOG_LEVEL")
+
     if err := viper.ReadInConfig(); err != nil {
-        return nil, fmt.Errorf(\"failed to read config: %w\", err)
+        if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+            return nil, fmt.Errorf("read config: %w", err)
+        }
+        // File is optional if env vars provide the required values.
     }
 
     var cfg Config
     if err := viper.Unmarshal(&cfg); err != nil {
-        return nil, fmt.Errorf(\"failed to unmarshal config: %w\", err)
+        return nil, fmt.Errorf("unmarshal config: %w", err)
     }
-
+    if cfg.Database == "" {
+        return nil, fmt.Errorf("database_url is required")
+    }
     return &cfg, nil
 }
 ```
 
-### 3. The Configuration File (`config.yaml`)
+`AutomaticEnv` alone will **not** map `DATABASE_URL` onto `database_url`. You need `BindEnv` (or a naming scheme that already matches). This is the most common Viper surprise.
+
+### 3. Example file (`config.yaml` or `configs/config.yaml`)
 
 ```yaml
 port: 8080
-database_url: \"postgres://localhost/heroes\"
-log_level: \"info\"
+database_url: "postgres://localhost/heroes"
+log_level: "info"
 ```
+
+Commit an example (`config.example.yaml`) with fake values. Put the real `config.yaml` in `.gitignore` if it can contain secrets. Prefer env vars for anything sensitive.
 
 ---
 
-## Best Practices
+## Best practices
 
-- **Use Environment Variables for Secrets**: Keep your database password in an environment variable (`DB_PASSWORD`), and only put non-sensitive defaults in your `config.yaml`.
-- **Set Defaults**: Use `viper.SetDefault(\"port\", 8080)` to ensure your app always has a working configuration even if the file is missing.
-- **Fail Fast**: If a critical configuration value is missing (like a database URL), your application should stop and print a clear error message.
+- **Secrets live in the environment** (or a secret manager), never in Git.
+- **Set defaults** for safe local values (`port`, `log_level`).
+- **Fail fast** if a required value (database URL, signing key) is missing.
+- **Don't watch files in production** unless you have a concrete hot-reload need. Restarting the process is simpler and safer.
 
-## Next Step
+## Next step
 
-Now that we can configure our app, let's learn how to store and retrieve data from a database.
+Now that we can configure the app, let's store and retrieve data.
 
-[08-database-access.md &rarr;](./08-database-access.md)
+[08-database-access.md →](./08-database-access.md)
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+[← Back to [TOC](README.md#table-of-contents)]

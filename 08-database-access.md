@@ -1,96 +1,138 @@
 # 08. Database Access
 
-In this chapter, we'll learn how to connect our Go application to a database and perform basic operations.
+In this chapter we connect a Go application to a SQL database.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [07-configuration-management.md](./07-configuration-management.md)] | [&rarr; [09-rest-apis.md](./09-rest-apis.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [07-configuration-management.md](./07-configuration-management.md)] | [→ [09-rest-apis.md](./09-rest-apis.md)]
 
-## The Database Landscape in Go
+## The landscape
 
-When it comes to databases, Go gives you three main options:
+You have four common choices, all sitting on top of a driver (`pgx` for PostgreSQL, `modernc.org/sqlite` or `crawshaw`/`mattn` for SQLite, etc.):
 
-1. **`database/sql` (Standard Library)**: The built-in way to talk to SQL databases. It's very fast but requires a lot of \"boilerplate\" code (manual work).
-2. **`sqlx` (Lightweight Helper)**: A library that sits on top of `database/sql`. it makes it much easier to map database rows into Go `structs`.
-3. **`GORM` (Object-Relational Mapper - ORM)**: A powerful library that lets you interact with your database using Go objects instead of writing SQL queries yourself.
+1. **`database/sql`** — standard library. Full control, more boilerplate.
+2. **`sqlx`** — thin helpers for scanning rows into structs.
+3. **`sqlc`** — you write SQL; a code generator produces type-safe Go.
+4. **GORM** (or Ent) — an ORM: you work with Go structs and let the library write SQL.
 
 ---
 
-## 1. GORM: For Rapid Development
+## 1. GORM: move fast on CRUD
 
-[**GORM**](https://gorm.io/) is fantastic for building things quickly. It handles most of the SQL for you and even manages your database structure (schema).
-
-### Example: Creating and Finding Heroes
+[**GORM**](https://gorm.io/) is convenient for prototypes and admin-style CRUD. It can create tables from structs (`AutoMigrate`) and hide a lot of SQL.
 
 ```go
 import (
-    \"gorm.io/gorm\"
-    \"gorm.io/driver/sqlite\"
+    "fmt"
+
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
 )
 
-func GormExample() {
-    // 1. Connect to a database (SQLite is a simple file-based DB)
-    db, _ := gorm.Open(sqlite.Open(\"heroes.db\"), &gorm.Config{})
+func GormExample() error {
+    db, err := gorm.Open(sqlite.Open("heroes.db"), &gorm.Config{})
+    if err != nil {
+        return fmt.Errorf("open db: %w", err)
+    }
 
-    // 2. Automatically create the 'heroes' table based on our struct
-    db.AutoMigrate(&Hero{})
+    if err := db.AutoMigrate(&Hero{}); err != nil {
+        return fmt.Errorf("migrate: %w", err)
+    }
 
-    // 3. Create a new hero
-    newHero := Hero{Name: \"Flash\"}
-    db.Create(&newHero)
+    newHero := Hero{Name: "Flash"}
+    if err := db.Create(&newHero).Error; err != nil {
+        return fmt.Errorf("create hero: %w", err)
+    }
 
-    // 4. Find a hero by their ID
     var hero Hero
-    db.First(&hero, newHero.ID)
+    if err := db.First(&hero, newHero.ID).Error; err != nil {
+        return fmt.Errorf("fetch hero: %w", err)
+    }
+    return nil
 }
 ```
 
+Check `.Error`. Ignoring it (the `db, _ := gorm.Open` pattern) is how silent data loss happens.
+
+`AutoMigrate` is fine on a laptop. In production, use versioned migration files (below).
+
 ---
 
-## 2. sqlx: For Full Control
+## 2. sqlx: SQL you can still read
 
-[**sqlx**](https://github.com/jmoiron/sqlx) is preferred by many professional Go developers because it allows you to write real SQL while removing the tedious parts of the standard library.
-
-### Example: Selecting into a Struct
+[**sqlx**](https://github.com/jmoiron/sqlx) stays close to `database/sql` and maps columns onto struct fields.
 
 ```go
-import \"github.com/jmoiron/sqlx\"
+import "github.com/jmoiron/sqlx"
 
-func SqlxExample(db *sqlx.DB) {
-    // sqlx can automatically map columns to struct fields!
+func ListHeroes(db *sqlx.DB, prefix string) ([]Hero, error) {
     var heroes []Hero
-    err := db.Select(&heroes, \"SELECT id, name FROM heroes WHERE name LIKE ?\", \"F%\")
+    err := db.Select(&heroes,
+        `SELECT id, name FROM heroes WHERE name LIKE ?`, prefix+"%")
     if err != nil {
-        // handle error
+        return nil, fmt.Errorf("list heroes: %w", err)
     }
+    return heroes, nil
 }
 ```
 
 ---
 
-## Which One Should You Choose?
+## 3. sqlc: SQL in, typed Go out
 
-| Feature | `database/sql` | `sqlx` | `GORM` |
-|---------|----------------|--------|--------|
-| **Ease of Use** | Difficult | Medium | Easy |
-| **Control** | Full | Full | Partial |
-| **Performance** | Best | Best | Good |
-| **SQL Knowledge** | Required | Required | Not Required |
+[**sqlc**](https://sqlc.dev/) is the option many production Go teams pick in 2026. You write ordinary SQL, run a generator, and call functions that return real structs — no reflection, no stringly-typed queries.
 
-**Our Recommendation**:
-- Use **GORM** if you want to move fast and don't want to write much SQL.
-- Use **sqlx** if you want full control over your database queries and want maximum performance.
+```sql
+-- query.sql
+SELECT id, name FROM heroes WHERE name LIKE $1;
+```
+
+```go
+heroes, err := queries.ListHeroesByName(ctx, prefix+"%")
+```
+
+Pair sqlc with **`pgx`** for PostgreSQL. The cost is a generate step (`sqlc generate`, often under `go generate`). The payoff is compile-time breakage when a column goes away.
 
 ---
 
-## A Note on Migrations
+## Which one should you choose?
 
-As your application grows, your database structure will change (e.g., adding a `power` column to the `heroes` table). **Migrations** are version-controlled scripts that update your database schema safely.
+| | `database/sql` | sqlx | sqlc | GORM |
+|--|----------------|------|------|------|
+| Ease of getting started | Harder | Medium | Medium (generator) | Easiest |
+| You write SQL | Yes | Yes | Yes | Usually no |
+| Type safety | Manual | Tags | Generated | Runtime |
+| Performance | Excellent | Excellent | Excellent | Good |
+| Schema changes | Migrations | Migrations | Migrations | `AutoMigrate` or migrations |
 
-While GORM has `AutoMigrate`, for professional projects we recommend tools like [**golang-migrate**](https://github.com/golang-migrate/migrate) to manage these changes explicitly.
+**Recommendation:**
 
-## Next Step
+- Learning / weekend CRUD: **GORM** is fine.
+- You want to learn real SQL and keep dependencies small: **sqlx** or plain `database/sql`.
+- A service you will keep for years: **sqlc + pgx** (or Ent if you want a graph-style schema in Go).
 
-Now that we have data in a database, let's learn how to share it with the world via a REST API.
+---
 
-[09-rest-apis.md &rarr;](./09-rest-apis.md)
+## Migrations and pooling
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+As the schema changes (add a `power` column), you need **migrations**: numbered SQL files that run once, in order, on every environment.
+
+- [**golang-migrate**](https://github.com/golang-migrate/migrate)
+- [**goose**](https://github.com/pressly/goose)
+- Ent and Atlas if you prefer generating migrations from a schema
+
+Always set pool limits. The defaults are too open for a container:
+
+```go
+sqlDB.SetMaxOpenConns(10)
+sqlDB.SetMaxIdleConns(5)
+sqlDB.SetConnMaxLifetime(30 * time.Minute)
+```
+
+Pass `context.Context` into queries (Chapter 14) so a cancelled HTTP request stops waiting on the database.
+
+## Next step
+
+Now that we have data, let's share it over HTTP.
+
+[09-rest-apis.md →](./09-rest-apis.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

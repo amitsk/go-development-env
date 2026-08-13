@@ -1,74 +1,86 @@
 # 12. CI/CD (Automation on GitHub)
 
-In this chapter, we'll learn how to automate our testing and building process using **CI/CD**.
+In this chapter we run the same checks on every push.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [11-static-analysis-linting.md](./11-static-analysis-linting.md)] | [&rarr; [13-llms.md](./13-llms.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [11-static-analysis-linting.md](./11-static-analysis-linting.md)] | [→ [13-llms.md](./13-llms.md)]
 
 ## What is CI/CD?
 
-In professional software development, you're constantly changing code. To make sure you don't accidentally break things, we use automation tools to run our tests and builds every single time we save our work to GitHub.
+- **Continuous Integration (CI)** — automatically test, vet, and lint every push and pull request so broken code never sits on the main branch unnoticed.
+- **Continuous Delivery / Deployment (CD)** — automatically build a release artifact (and sometimes deploy it).
 
-- **Continuous Integration (CI)**: Automatically testing and linting your code every time you push it. This ensures that new changes don't \"break\" the existing application.
-- **Continuous Delivery/Deployment (CD)**: Automatically building and \"releasing\" your application to your users.
+This chapter is CI. CD comes later, once you have somewhere to deploy.
 
 ---
 
-## Introducing GitHub Actions
+## GitHub Actions
 
-[**GitHub Actions**](https://github.com/features/actions) is a powerful tool built directly into GitHub that handles CI/CD for you. You define your automation steps in a YAML file inside your repository.
+[**GitHub Actions**](https://github.com/features/actions) runs workflows from YAML files in `.github/workflows/`.
 
-### Example: A Simple CI Workflow
-
-Create a file at `.github/workflows/ci.yml`:
+### Example: `.github/workflows/ci.yml`
 
 ```yaml
 name: CI
 
-# 1. When should this run?
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   test:
-    # 2. What operating system should it run on?
     runs-on: ubuntu-latest
-
     steps:
-    # 3. Get the code from the repository
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-    # 4. Set up the environment using mise
-    # This ensures the CI server uses the same Go version as you!
-    - uses: jdx/mise-action@v2
+      # Installs mise, then every tool in mise.toml (Go, golangci-lint, …)
+      - uses: jdx/mise-action@v4
 
-    # 5. Run the automation steps from our Makefile
-    - name: Run Linting
-      run: make lint
+      - name: Lint
+        run: make lint
 
-    - name: Run Tests
-      run: make test
+      - name: Vet
+        run: make vet
 
-    - name: Run Build
-      run: make build
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build
 ```
 
----
-
-## Why Use `mise` in CI?
-
-One of the biggest problems in software development is when code works on your laptop but fails on the server. By using the `jdx/mise-action`, you guarantee that the CI server is using the **exact same version of Go** (and other tools) that you defined in your `.mise.toml` file.
+Pin major versions of actions (`@v4`, `@v6`); do not use `@master`. The [mise CI docs](https://mise.jdx.dev/continuous-integration.html) and the [mise-action README](https://github.com/jdx/mise-action) list the current tags — bump when you read their release notes. `actions/checkout` also publishes v5 and v7.
 
 ---
 
-## The Benefits
+## Why mise in CI?
 
-- **Peace of Mind**: You'll get a green checkmark next to your code on GitHub if all tests pass.
-- **Safe Collaboration**: If you're working with others, you can be sure that their changes won't break your work (and vice versa).
-- **Faster Feedback**: You don't have to wait for someone to manually test your code.
+The whole point of `mise.toml` is that **laptop and CI install the same versions**. If you instead write `go-version: '1.26.5'` in `actions/setup-go` and `go = "1.26"` in mise, those two files will drift.
 
-## Next Step
+mise-action:
 
-Now that our code is clean and tested, let's learn how to use AI to help us write even better code.
+1. Installs mise
+2. Reads `mise.toml`
+3. Puts `go` and `golangci-lint` on `PATH`
+4. Caches the installs so the next run is faster
 
-[13-llms.md &rarr;](./13-llms.md)
+Then `make test` is the same command you run locally.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+This tutorial repo ships a working workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) sets `working-directory: heroes-service` so the docs at the root are not treated as a Go module.
+
+---
+
+## A few upgrades when you are ready
+
+- **`go test -race`** on a separate job (slower; still worth it on `main`).
+- **`govulncheck ./...`** as its own step (Chapter 11).
+- **Dependabot or Renovate** for `go.mod` and GitHub Actions versions.
+- **CD**: build a container (Chapter 14) and push it to a registry on tagged releases only.
+
+## Next step
+
+Let's talk about using AI assistants without skipping review.
+
+[13-llms.md →](./13-llms.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

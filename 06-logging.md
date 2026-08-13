@@ -1,93 +1,127 @@
-# 05. Structured Logging
+# 06. Structured Logging
 
-In this chapter, we'll learn how to properly record what's happening in our application using **Structured Logging**.
+In this chapter we record what the application is doing with **structured logging**.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [04-makefile.md](../04-makefile.md)] | [&rarr; [06-configuration-management.md](../06-configuration-management.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [05-makefile.md](./05-makefile.md)] | [→ [07-configuration-management.md](./07-configuration-management.md)]
 
-## Why Not Just `fmt.Println`?
+## Why not just `fmt.Println`?
 
-When you're first learning to code, `fmt.Println` is a great way to see what's happening. But in a professional application, it's not enough because:
+`fmt.Println` is fine while you learn. In production it falls short:
 
-1. **No Levels**: You can't distinguish between a minor \"info\" message and a critical \"error\" message.
-2. **Hard to Search**: If you have thousands of lines of logs, finding a specific event is impossible.
-3. **Machine Unfriendly**: Computers can't easily parse simple text strings to generate alerts or dashboards.
+1. **No levels** — you cannot tell a routine "info" from a crash.
+2. **Hard to search** — thousands of free-form lines do not query well.
+3. **Machine-unfriendly** — dashboards and alerts want key/value fields, not English sentences.
 
 ---
 
-## What is Structured Logging?
+## What is structured logging?
 
-**Structured logging** means writing logs in a consistent, machine-readable format (like JSON). Instead of a message like `\"User 123 logged in\"`, you write something like:
+Write logs as consistent, machine-readable records (usually JSON). Instead of `User 123 logged in`:
 
 ```json
-{\"time\": \"2024-01-01T12:00:00Z\", \"level\": \"INFO\", \"msg\": \"user login\", \"user_id\": 123}
+{"time":"2026-08-12T12:00:00Z","level":"INFO","msg":"user login","user_id":123}
 ```
-
-This allows tools to easily search and analyze your logs.
 
 ---
 
-## Introducing `slog` (Standard Library)
+## `log/slog` (standard library since Go 1.21)
 
-Since Go 1.26, there is a built-in structured logger called `slog`. It's powerful, fast, and easy to use.
+Since **Go 1.21** (August 2023), the standard library includes `log/slog`. You do not need an extra module for structured logs on any supported Go release.
 
-### Basic Setup
-
-Here's how you can set up a logger that outputs JSON to your terminal:
+### Basic setup
 
 ```go
 package main
 
 import (
-    \"log/slog\"
-    \"os\"
+    "log/slog"
+    "os"
 )
 
 func main() {
-    // 1. Create a JSON handler that writes to standard output (terminal)
-    handler := slog.NewJSONHandler(os.Stdout, nil)
-
-    // 2. Create the logger
+    handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    })
     logger := slog.New(handler)
+    slog.SetDefault(logger)
 
-    // 3. Log a message with structured data
-    logger.Info(\"hero created\",
-        slog.Int(\"id\", 1),
-        slog.String(\"name\", \"Superman\"),
+    logger.Info("hero created",
+        slog.Int("id", 1),
+        slog.String("name", "Superman"),
     )
 }
 ```
 
+Use **`slog.NewTextHandler`** while developing (easier to read) and JSON in staging/production.
+
+### Always attach the error as a field
+
+```go
+if err != nil {
+    logger.Error("create hero failed",
+        slog.String("name", name),
+        slog.Any("err", err),
+    )
+    return err
+}
+```
+
+A message of `"error: " + err.Error()` loses structure. Keep `err` as its own attribute.
+
+### Child loggers and groups
+
+```go
+reqLog := logger.With(slog.String("request_id", reqID))
+reqLog.Info("handler start")
+
+// Groups nest related keys: db.query, db.rows
+dbLog := logger.WithGroup("db")
+dbLog.Info("query", slog.String("sql", "SELECT …"))
+```
+
+Pass the `*slog.Logger` (or a `context.Context` with `slog.NewContext` / `Logger.With`) into handlers and stores instead of calling a global logger from deep packages. Globals are fine at the edge (`main`).
+
+### Multiple destinations (Go 1.26)
+
+Go 1.26 added [`slog.NewMultiHandler`](https://pkg.go.dev/log/slog#NewMultiHandler): fan the same records out to several handlers (for example JSON to stdout *and* a file, or a test buffer).
+
+```go
+logger := slog.New(slog.NewMultiHandler(
+    slog.NewJSONHandler(os.Stdout, nil),
+    slog.NewTextHandler(debugFile, &slog.HandlerOptions{Level: slog.LevelDebug}),
+))
+```
+
 ---
 
-## Understanding Log Levels
+## Log levels
 
-Log levels help you filter your logs based on how important they are:
+- **DEBUG** — noisy detail for developers. Off in production by default.
+- **INFO** — normal operation ("server started", "hero created").
+- **WARN** — unexpected but the request or process can continue.
+- **ERROR** — an operation failed.
 
-- **DEBUG**: Extremely detailed info for developers only.
-- **INFO**: General things that happen during normal operation (e.g., \"Server started\").
-- **WARN**: Something unexpected happened, but the app is still working.
-- **ERROR**: Something went wrong, and an action or request failed.
+Set the minimum level from configuration (Chapter 7), not a hard-coded constant.
 
 ---
 
-## Alternatives: Zerolog
+## Alternatives
 
-While `slog` is the standard, many older projects use [**Zerolog**](https://github.com/rs/zerolog). It's incredibly fast and popular in high-performance applications.
+| Feature | `log` (old stdlib) | `slog` | [zap](https://github.com/uber-go/zap) / [zerolog](https://github.com/rs/zerolog) |
+|---------|--------------------|--------|----------------------------------|
+| In the standard library? | Yes | Yes (Go 1.21+) | No |
+| Structured fields | No | Yes | Yes |
+| Performance | Fine | Very good | Best-in-class |
+| When to choose | Tiny CLIs | **Default for new code** | Existing codebases or extreme throughput |
 
-**Comparison:**
+**Recommendation:** use `slog` for new projects. Reach for zap or zerolog only if you already depend on them or you have measured a logging bottleneck.
 
-| Feature | `slog` | `zerolog` |
-|---------|--------|-----------|
-| Included in Go? | Yes (Go 1.26+) | No (requires `go get`) |
-| Performance | Very Good | Excellent (the fastest) |
-| Ease of Use | Easy | Slightly more complex |
+Chapter 17 attaches a `request_id` to these records in [`heroes-service`](./heroes-service/internal/api/middleware.go).
 
-**Our Recommendation**: Use `slog` for all new projects unless you have a specific reason to need the extreme speed of Zerolog.
+## Next step
 
-## Next Step
+Now that we can log what the app is doing, let's configure it without changing the code.
 
-Now that we can log what our app is doing, let's learn how to configure it without changing the code.
+[07-configuration-management.md →](./07-configuration-management.md)
 
-[07-configuration-management.md &rarr;](./07-configuration-management.md)
-
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+[← Back to [TOC](README.md#table-of-contents)]

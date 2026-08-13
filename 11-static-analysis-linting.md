@@ -1,66 +1,113 @@
 # 11. Static Analysis & Linting
 
-In this chapter, we'll learn how to keep our code clean, consistent, and free of common mistakes using **Static Analysis**.
+In this chapter we catch mistakes *without running the program*.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [10-unit-testing.md](./10-unit-testing.md)] | [&rarr; [12-ci-cd.md](./12-ci-cd.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [10-unit-testing.md](./10-unit-testing.md)] | [→ [12-ci-cd.md](./12-ci-cd.md)]
 
-## What is Static Analysis?
+## What is static analysis?
 
-**Static analysis** means checking your code for errors *without actually running it*. It's like having a very strict teacher proofread your essay before you turn it in. There are two main parts:
+Two related jobs:
 
-1. **Formatting**: Ensuring the code \"looks\" right (indentation, spacing, etc.).
-2. **Linting**: Checking the \"logic\" for common mistakes (unused variables, ignoring errors, etc.).
+1. **Formatting** — the code looks like everyone else's Go (`gofmt` / `goimports`).
+2. **Linting / vetting** — unused variables, ignored errors, buggy patterns, known vulnerabilities.
 
 ---
 
-## 1. Formatting with `gofmt`
+## 1. Formatting with `gofmt` and `goimports`
 
-In many languages, developers argue for years about where to put curly braces. In Go, we don't!
+Go does not have a style debate. `gofmt` is the style.
 
-Go comes with a tool called `gofmt`. It automatically formats your code to follow the official Go style. This is amazing because:
-- All Go code looks the same, regardless of who wrote it.
-- You never have to waste time thinking about indentation again.
-
-**How to run it:**
 ```bash
 go fmt ./...
 ```
 
+**`goimports`** is `gofmt` plus keeping the import block tidy. The VS Code Go extension runs it on save if you enabled `source.organizeImports` (see the README).
+
+Some teams use [gofumpt](https://github.com/mvdan/gofumpt), a stricter `gofmt`. Only adopt it if the whole team agrees.
+
 ---
 
-## 2. Linting with `golangci-lint`
+## 2. `go vet`
 
-While `gofmt` makes your code look pretty, [**golangci-lint**](https://golangci-lint.run/) makes sure it's correct. It's actually a collection of many different \"linters\" that check for different things:
+`go vet` ships with the toolchain and finds common bugs (`fmt` verb mismatches, suspicious copies of locks, and so on):
 
-- **errcheck**: Did you forget to check an error returned by a function?
-- **staticcheck**: Are you using deprecated functions or doing something inefficient?
-- **unused**: Do you have variables or functions that aren't being used?
-
-### Installation
-We use **mise** to install it:
 ```bash
-mise install golangci-lint@latest
+go vet ./...
 ```
 
-### How to run it
+It is fast. Always run it. The Makefile in Chapter 5 already has a `vet` target.
+
+### `go fix` (revamped in Go 1.26)
+
+Go 1.26 rebuilt **`go fix`** as a *modernizer*: it rewrites code to newer, equivalent idioms. Safe to try on a branch:
+
+```bash
+go fix ./...
+git diff
+```
+
+Review the diff. Modernizers should not change behavior; if one does, [file an issue](https://go.dev/issue/new).
+
+---
+
+## 3. `golangci-lint` v2
+
+[**golangci-lint**](https://golangci-lint.run/) runs many linters in one process. Current line is **v2** (2.12.x as of mid-2026). v1 configs are not drop-in compatible — if you copy an old `.golangci.yml` from the internet, migrate it (`golangci-lint migrate`) or start fresh.
+
+Install it with mise so the version is pinned next to Go:
+
+```bash
+mise use golangci-lint@2
+golangci-lint version
+```
+
 ```bash
 golangci-lint run
 ```
 
+Useful default linters include:
+
+- **errcheck** — ignored errors
+- **staticcheck** — deprecated APIs, pointless code, real bugs
+- **unused** — dead functions and fields
+- **govet** — the same checks as `go vet`
+
+A minimal config (v2 format; generate one with `golangci-lint config`) is enough to start. [`heroes-service/.golangci.yml`](./heroes-service/.golangci.yml) uses the v2 `default: standard` set.
+
 ---
 
-## Automation is Key
+## 4. Vulnerability scanning
 
-You shouldn't have to remember to run these tools manually. Professional setups do two things:
+[**govulncheck**](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) reports known vulnerabilities in *code you actually call*, not just modules you happen to download.
 
-1. **Editor Integration**: Configure VS Code to run `gofmt` every time you save a file.
-2. **Makefile Integration**: Add a `lint` target to your Makefile (we did this in Chapter 4!).
-3. **Continuous Integration (CI)**: Automatically run these checks every time you push code to GitHub (we'll see this in the next chapter!).
+```bash
+mise use govulncheck@latest
+mise exec -- govulncheck ./...
+```
 
-## Next Step
+Or, with Go 1.24+'s tool directive (Chapter 14):
 
-Now that our code is clean and tested, let's learn how to automate the whole process using CI/CD.
+```bash
+go get -tool golang.org/x/vuln/cmd/govulncheck
+go tool govulncheck ./...
+```
 
-[12-ci-cd.md &rarr;](./12-ci-cd.md)
+Run this in CI. Treat findings like failing tests.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+---
+
+## Automation
+
+You should not have to remember these commands.
+
+1. **Editor** — format (and organize imports) on save.
+2. **Makefile** — `make` runs `fmt`, `vet`, `lint`, and `test` (Chapter 5).
+3. **CI** — the same `make` targets on every push (Chapter 12).
+
+## Next step
+
+Let's run the same checks on GitHub.
+
+[12-ci-cd.md →](./12-ci-cd.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

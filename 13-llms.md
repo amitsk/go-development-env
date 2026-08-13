@@ -1,76 +1,82 @@
-# 13. AI-Powered Development (LLMs)
+# 13. AI-Powered Development
 
-In this chapter, we'll learn how to use **Large Language Models (LLMs)** and AI tools to supercharge your Go development workflow.
+In this chapter we use language-model assistants without letting them silently lower the quality of the code.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [12-ci-cd.md](./12-ci-cd.md)] | [&rarr; [14-advanced-topics.md](./14-advanced-topics.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [12-ci-cd.md](./12-ci-cd.md)] | [→ [14-advanced-topics.md](./14-advanced-topics.md)]
 
-## What are LLMs?
+## What they are good at in Go
 
-**Large Language Models (LLMs)** like GPT-4 (OpenAI), Claude (Anthropic), and Llama (Meta) are AI systems trained on massive amounts of code. They can help you write functions, find bugs, and explain complex concepts in plain English.
+Models such as Claude, GPT, Gemini, and Grok are trained on a lot of public Go. They are genuinely useful for:
 
-In the Go ecosystem, these tools are especially helpful for:
-- Generating **error handling** boilerplate (which Go has a lot of!).
-- Writing **Unit Tests** and mock data.
-- Explaining **Concurrency** (Goroutines and Channels).
-- Suggesting **Idiomatic** ways to write your code.
+- The repetitive `if err != nil { return fmt.Errorf(...) }` wrapping from Chapter 3
+- First drafts of table-driven tests
+- Explaining a `select` or a `context` cancel you have not seen before
+- Translating a curl session into a `net/http` handler
 
----
-
-## Essential AI Tools for Go
-
-Professional Go developers often use these specialized tools instead of just copying and pasting from a website.
-
-### 1. Cursor (The AI Code Editor)
-
-[**Cursor**](https://cursor.com) is a fork of VS Code that has AI built directly into its core. Since it's based on VS Code, all your Go extensions will work perfectly!
-
-- **Cmd+K (Ctrl+K)**: Ask the AI to edit or generate code directly in your file.
-- **Cmd+L (Ctrl+L)**: Chat with the AI about your entire project. It "reads" your files to give you accurate answers.
-- **Tab to Predict**: It can often predict your next line of code, including the `if err != nil` check!
-
-### 2. Claude Code (The Terminal Assistant)
-
-[**Claude Code**](https://github.com/anthropics/claude-code) is a tool that runs in your terminal. It can actually **run your Go commands** for you.
-
-You can say:
-> "Claude, run my tests and fix any bugs you find."
-
-It will run `go test ./...`, see the failure, read the code, apply a fix, and run the tests again until they pass.
-
-### 3. GitHub Copilot
-
-The most common tool, [**GitHub Copilot**](https://github.com/features/copilot), lives as an extension in VS Code. It provides "autofill" for your code as you type.
+They are **not** a substitute for reading the standard library or for `go test`.
 
 ---
 
-## Best Practices for AI in Go
+## Tools you will actually see
 
-Using AI is a skill. Here is how to do it professionally:
+The product names change faster than Go does. The *jobs* stay the same.
 
-### 1. Never Blindly Trust
-AI can "hallucinate" (make things up). Always read the code it generates. If it writes a function, make sure it handles errors the Go way!
+### 1. An AI-native editor (Cursor, and VS Code + Copilot)
 
-### 2. Provide Context
-Instead of saying "Write a Go function to save a hero," say:
-> "Write a Go function that saves a Hero struct to a GORM database. It should return an error if the Name is empty."
+[**Cursor**](https://cursor.com) is a VS Code fork with the model in the edit loop. The official Go extension still works, so `gofmt` and `gopls` stay in charge of the file.
 
-### 3. Use AI for Explanations
-If you see a complex Go feature (like `select` or `context`), ask the AI:
-> "Explain this code to me like I'm a beginner. What is happening here?"
+- Inline edit (`Ctrl+K` / `Cmd+K`) — "wrap this error with `%w` and a `store.create` prefix"
+- Chat over the repo — "where do we open the database?"
+- Tab completion — often guesses the `if err != nil` you were about to type
 
-### 4. Let it Write Tests
-AI is amazing at writing tests. You can select a function and ask:
-> "Generate three table-driven tests for this function, including one error case."
+[**GitHub Copilot**](https://github.com/features/copilot) is the same idea as a VS Code extension.
+
+### 2. A terminal agent
+
+Tools such as [Claude Code](https://github.com/anthropics/claude-code), similar CLI agents, and editor-integrated agents can *run* `go test ./...`, read the failure, edit a file, and run the tests again.
+
+That loop is powerful. It is also how a model can "fix" a test by deleting the assertion. Watch the diff.
+
+### 3. Chat in the browser
+
+Fine for explanations. Weak for multi-file changes because it cannot see `go.mod` or your `internal/` layout unless you paste them.
 
 ---
 
-## A Note on Security
-**Important:** Never paste sensitive information like **API Keys**, **Passwords**, or private company data into an AI tool unless you are sure it is secure and permitted by your organization.
+## How to use them professionally
 
-## Next Step
+### 1. Never merge unread code
 
-Now that you have an AI assistant by your side, let's explore some more advanced Go topics.
+Models invent APIs that do not exist (`viper.MustLoad`, `gin.MustRun`). They ignore errors. They import deprecated packages. Read every line. Run `make`.
 
-[14-advanced-topics.md &rarr;](./14-advanced-topics.md)
+### 2. Give the constraint, not the vibe
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+Worse: "write a function to save a hero."
+
+Better: "Write `func (s *Store) Create(ctx context.Context, h models.Hero) error` using `database/sql`. Reject an empty `Name`. Wrap errors with `fmt.Errorf` and `%w`."
+
+### 3. Ask it to explain *your* code
+
+Paste a `select` and ask what happens when both cases are ready. Then confirm against [Effective Go](https://go.dev/doc/effective_go#concurrency).
+
+### 4. Let it draft tests, then tighten them
+
+"Generate table-driven tests for `ValidateHeroName`, including empty, too-short, and a name with spaces. Use `t.Run`."
+
+You still decide what "correct" means.
+
+---
+
+## Security
+
+Do not paste production secrets, customer data, or private company code into a tool your organization has not approved. Browser chat is not your repo's access-control list.
+
+Treat generated dependency suggestions like any other `go get`: read the module path, pin a version, run `govulncheck`.
+
+## Next step
+
+A few topics you will meet as the project grows.
+
+[14-advanced-topics.md →](./14-advanced-topics.md)
+
+[← Back to [TOC](README.md#table-of-contents)]
