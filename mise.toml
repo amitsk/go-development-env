@@ -1,0 +1,6 @@
+# Pins tools for this repo's sample service and for CI.
+# Tutorial chapters live at the root; the runnable module is heroes-service/.
+
+[tools]
+go = "1.26"
+golangci-lint = "2"

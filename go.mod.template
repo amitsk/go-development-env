@@ -1,10 +1,11 @@
-module github.com/yourusername/heroes-api
+module github.com/yourusername/heroes-service
 
-go 1.23
+go 1.26.0
 
-require (
-\tgithub.com/gin-gonic/gin v1.10.0
-\tgithub.com/spf13/viper v1.19.0
-\tgorm.io/gorm v1.27.1
-\t// etc.
-)
+// Add modules only when you import them, then run `go mod tidy`.
+// Typical starting set for this tutorial:
+//
+//   go get github.com/gin-gonic/gin@v1.12.0
+//   go get github.com/spf13/viper
+//   go get github.com/stretchr/testify
+//   go get -tool golang.org/x/vuln/cmd/govulncheck

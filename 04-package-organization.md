@@ -1,113 +1,132 @@
 # 04. Package Organization
 
-Organizing your code is one of the most important skills in professional software development. In this chapter, we'll learn about the standard layout used in the Go community.
+Organizing your code is one of the most important skills in professional software development. This chapter covers what the Go team actually recommends, then a layout that works well for a small HTTP service.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [03-error-handling.md](./03-error-handling.md)] | [&rarr; [05-makefile.md](./05-makefile.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [03-error-handling.md](./03-error-handling.md)] | [→ [05-makefile.md](./05-makefile.md)]
 
-## Why Proper Organization?
+## Start smaller than you think
 
-When your project is small, you can put everything in one file. But as it grows, finding things becomes harder. A standard layout helps you and others understand where things belong and what they do.
+When the project is small, **one package in the repo root is fine**. The official guide, [Organizing a Go module](https://go.dev/doc/modules/layout), is explicit about this:
+
+- A tiny command can be `main.go` + `go.mod` at the root.
+- Split into extra packages only when a file is doing two jobs.
+- Prefer `internal/` for supporting packages you do not want other modules to import.
+
+The popular [golang-standards/project-layout](https://github.com/golang-standards/project-layout) repo is **not** an official standard. Empty `pkg/`, `api/`, `scripts/`, and `configs/` folders do not make a project professional. Add a directory when you have a second file that belongs there.
 
 ---
 
-## The Idiomatic Go Layout
+## A practical service layout
 
-Here's a common structure for a Go service. You'll see this in many professional projects:
+Once you have an HTTP API, a data layer, and maybe a second binary, this shape is common and matches the official "server project" advice (`cmd/` + `internal/`):
 
 ```text
-project/
-├── cmd/             # Your application's entry points (the main functions)
-│   └── heroes/      # A specific application named 'heroes'
-│       └── main.go  # The main entry file for this app
-├── internal/        # Private code only for this project
-│   ├── api/         # Handling HTTP requests and responses
-│   ├── models/      # Defining the data types your app uses
-│   └── store/       # Logic for saving and loading data
-├── pkg/             # Public code that other projects could use (use sparingly)
-├── configs/         # Configuration files (JSON, YAML, .env)
-├── scripts/         # Helpful scripts for building or deploying
-├── test/            # Integration and larger-scale tests
-├── go.mod           # Your project's module definition
-├── Makefile         # Automation commands for your project
-└── README.md        # Documentation for your project
+heroes-service/
+├── cmd/
+│   └── heroes/
+│       └── main.go          # package main — wiring only
+├── internal/
+│   ├── api/                 # HTTP handlers
+│   ├── models/              # data types
+│   └── store/               # persistence
+├── configs/                 # optional: YAML / example env files
+├── go.mod
+├── mise.toml
+├── Makefile
+└── README.md
 ```
 
+Skip `pkg/` until you are *sure* another module should import that code. Most services never need it.
+
+This repository's [`heroes-service/`](./heroes-service/) is that layout with real files. Chapter 16 walks it end to end.
+
+### 1. `cmd/` — entry points
+
+Each subdirectory is a separate binary. Keep `main` thin: parse flags, load config, construct dependencies, call `ListenAndServe`. Business logic lives under `internal/`.
+
+### 2. `internal/` — compiler-enforced privacy
+
+Any package under `internal/` **cannot** be imported by other modules. That is a language rule, not a convention. It lets you refactor freely.
+
+### 3. Libraries vs applications
+
+| | Library (importable package) | Application / server |
+|--|------------------------------|----------------------|
+| Root package | Public API (`package heroes`) | Usually no public Go API |
+| Binaries | Optional `cmd/` | `cmd/<name>/main.go` |
+| Internals | `internal/` for unexported helpers | Almost everything in `internal/` |
+
 ---
 
-## Key Concepts
+## Example: the Heroes service
 
-### 1. `cmd/` - Entry Points
-
-The `cmd/` directory is where you put the entry point of your application. Each folder inside `cmd/` will result in a separate binary (executable program). This is where your `package main` lives.
-
-### 2. `internal/` - The Heart of Your Code
-
-The `internal/` directory is special in Go. Any code placed inside `internal/` cannot be imported by other projects. This is perfect for keeping your private logic safe and avoiding \"accidental\" public APIs.
-
-### 3. `pkg/` - Public Utilities
-
-The `pkg/` directory is for code that is okay for other projects to use. In many modern Go apps, we skip `pkg/` and put everything in `internal/` until we're absolutely sure it should be public.
-
----
-
-## Example: The Heroes Service
-
-Let's look at how these pieces fit together.
-
-### The Model (`internal/models/hero.go`)
+### The model (`internal/models/hero.go`)
 
 ```go
 package models
 
 // Hero represents a single hero in our system.
 type Hero struct {
-    ID   int    `json:\"id\"`
-    Name string `json:\"name\"`
+    ID   int    `json:"id"`
+    Name string `json:"name"`
 }
 ```
 
-### The Store (`internal/store/store.go`)
-
-This is where we define how to interact with our hero data.
+### The store (`internal/store/store.go`)
 
 ```go
 package store
 
-import \"github.com/yourusername/heroes-service/internal/models\"
+import "github.com/yourusername/heroes-service/internal/models"
 
-// Store is an interface for managing hero data.
+// Store is how the rest of the app reads and writes heroes.
 type Store interface {
     GetHeroes() ([]models.Hero, error)
 }
 ```
 
-### The App Entry Point (`cmd/heroes/main.go`)
+Using an interface here makes tests easy later (Chapter 10): you can swap a fake store for a database.
+
+### The app entry point (`cmd/heroes/main.go`)
 
 ```go
 package main
 
 import (
-    \"fmt\"
-    \"github.com/yourusername/heroes-service/internal/models\"
+    "fmt"
+
+    "github.com/yourusername/heroes-service/internal/models"
 )
 
 func main() {
-    // Imagine we're fetching heroes here...
-    h := models.Hero{ID: 1, Name: \"Super Go\"}
-    fmt.Printf(\"Hello, %s!\\n\", h.Name)
+    h := models.Hero{ID: 1, Name: "Super Go"}
+    fmt.Printf("Hello, %s!\n", h.Name)
 }
 ```
 
-## Best Practices
+Run it from the module root:
 
-- **Keep it simple**: Don't create folders just because you think you should. Start small and only add folders when they help organize things.
-- **Lowercase Names**: Package and folder names should be short, simple, and all lowercase.
-- **One Responsibility**: Each package should have one clear purpose.
+```bash
+go run ./cmd/heroes
+```
 
-## Next Step
+---
 
-Now that we know how to organize our code, let's learn how to automate our development tasks.
+## Naming and pitfalls
 
-[05-makefile.md &rarr;](./05-makefile.md)
+- **Package names** are short, lowercase, singular (`store`, not `stores` or `store_utils`).
+- **No "god" packages** named `util`, `common`, or `helpers`. If you cannot name the package after what it *does*, the code probably belongs next to its caller.
+- **Cyclic imports** (`api` imports `store` imports `api`) mean the packages are not really separate. Extract a third package (often `models`) or merge them.
+- **One package per directory.** All `.go` files in a folder share the same `package` name.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+## Try this
+
+Start from the single-file `main.go` in Chapter 2. Move it to `cmd/heroes/main.go` and put `Hero` in `internal/models`. Confirm `go run ./cmd/heroes` still works.
+
+## Next step
+
+Now that we know how to organize the code, let's automate the development tasks.
+
+[05-makefile.md →](./05-makefile.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

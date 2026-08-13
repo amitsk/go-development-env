@@ -1,64 +1,65 @@
-# 10. Unit Testing & Tools
+# 10. Unit Testing
 
-In this chapter, we'll learn how to ensure our code works as expected by writing **Unit Tests**.
+In this chapter we make sure the code does what we think it does.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [09-rest-apis.md](./09-rest-apis.md)] | [&rarr; [11-static-analysis-linting.md](./11-static-analysis-linting.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [09-rest-apis.md](./09-rest-apis.md)] | [→ [11-static-analysis-linting.md](./11-static-analysis-linting.md)]
 
-## Why Unit Testing?
+## Why unit testing?
 
-A **unit test** is a small piece of code that tests a single \"unit\" of your application (like a function) in isolation. Professional developers write tests because:
+A **unit test** exercises one small piece of behavior (usually a function) without a real database or network.
 
-1. **Confidence**: You can change your code (refactor) and know immediately if you broke something.
-2. **Documentation**: Tests show others how your functions are intended to be used.
-3. **Better Design**: Code that is easy to test is usually well-organized and modular.
+1. **Confidence** — refactor and know immediately if you broke something.
+2. **Documentation** — tests show how the function is supposed to be used.
+3. **Design** — code that is hard to test is usually too coupled.
 
 ---
 
-## How Testing Works in Go
+## How testing works in Go
 
-Go has excellent built-in support for testing. You don't need to install anything to get started.
+Nothing extra to install.
 
-- **File Naming**: Any file ending in `_test.go` is considered a test file.
-- **Function Naming**: Test functions must start with `Test` and take one argument: `t *testing.T`.
-
-### Example: A Simple Test
-
-If you have a function `Add(a, b int)`, your test would look like this:
+- Files ending in `_test.go` are test files (they are not part of `go build`).
+- Functions named `TestXxx(t *testing.T)` are tests.
 
 ```go
 func TestAdd(t *testing.T) {
     result := Add(2, 3)
     if result != 5 {
-        t.Errorf(\"Add(2, 3) = %d; want 5\", result)
+        t.Errorf("Add(2, 3) = %d; want 5", result)
     }
 }
 ```
 
+```bash
+go test ./...
+go test -v ./internal/models
+```
+
+`-count=1` disables test caching when you are chasing a flake.
+
 ---
 
-## Idiomatic Go: Table-Driven Tests
+## Table-driven tests
 
-In Go, we often use **table-driven tests** to test many different inputs for the same function without repeating ourselves.
+Test many inputs without copy-paste. Always use `t.Run` so failures name the case:
 
 ```go
 func TestHeroValidation(t *testing.T) {
-    // 1. Define the \"table\" of test cases
     tests := []struct {
         name     string
         heroName string
         isValid  bool
     }{
-        {\"Valid name\", \"Superman\", true},
-        {\"Empty name\", \"\", false},
-        {\"Too short\", \"A\", false},
+        {name: "valid", heroName: "Superman", isValid: true},
+        {name: "empty", heroName: "", isValid: false},
+        {name: "too short", heroName: "A", isValid: false},
     }
 
-    // 2. Iterate through the table
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            result := ValidateHeroName(tt.heroName)
-            if result != tt.isValid {
-                t.Errorf(\"got %v, want %v\", result, tt.isValid)
+            got := ValidateHeroName(tt.heroName)
+            if got != tt.isValid {
+                t.Errorf("ValidateHeroName(%q) = %v; want %v", tt.heroName, got, tt.isValid)
             }
         })
     }
@@ -67,43 +68,79 @@ func TestHeroValidation(t *testing.T) {
 
 ---
 
-## Making Tests Easier with `testify`
+## `testify` (optional)
 
-While Go's built-in testing is great, many developers use the [**Testify**](https://github.com/stretchr/testify) library to make their assertions more readable.
+[**testify**](https://github.com/stretchr/testify) makes assertions shorter. It is widely used; it is not required.
 
 ```go
-import \"github.com/stretchr/testify/assert\"
+import "github.com/stretchr/testify/assert"
+import "github.com/stretchr/testify/require"
 
-func TestSomething(t *testing.T) {
+func TestAdd(t *testing.T) {
     result := Add(2, 3)
-    
-    // Much cleaner than if statements!
-    assert.Equal(t, 5, result, \"they should be equal\")
-    assert.NotNil(t, result)
+    require.Equal(t, 5, result) // require = stop this test on failure
 }
 ```
 
+Use `require` when later lines would panic on a bad result; use `assert` to collect multiple failures.
+
 ---
 
-## Measuring Success: Code Coverage
+## HTTP handlers with `httptest`
 
-**Code coverage** tells you what percentage of your code is actually being tested. You can see this easily in Go:
+```go
+func TestListHeroes(t *testing.T) {
+    req := httptest.NewRequest(http.MethodGet, "/heroes", nil)
+    rec := httptest.NewRecorder()
 
-1. Run tests and generate a report:
-   ```bash
-   go test -coverprofile=coverage.out ./...
-   ```
-2. View the report in your browser:
-   ```bash
-   go tool cover -html=coverage.out
-   ```
+    ListHeroes(rec, req) // or mux.ServeHTTP(rec, req)
 
-**Pro Tip**: Aim for at least 80% coverage in your projects!
+    if rec.Code != http.StatusOK {
+        t.Fatalf("status %d", rec.Code)
+    }
+}
+```
 
-## Next Step
+No real TCP port. Fast and deterministic. See [`heroes-service/internal/api/server_test.go`](./heroes-service/internal/api/server_test.go) for create/get/404 cases, and [`hero_test.go`](./heroes-service/internal/models/hero_test.go) for a fuzz target.
 
-Now that we know our code works, let's make sure it follows professional standards for quality and style.
+---
 
-[11-static-analysis-linting.md &rarr;](./11-static-analysis-linting.md)
+## Race detector, fuzzing, benchmarks
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+```bash
+# Data races (goroutines + shared memory). Use before you push.
+go test -race ./...
+
+# Fuzzing — Go feeds random inputs looking for panics / interesting cases
+go test -fuzz=FuzzParse -fuzztime=30s ./internal/api
+
+# Benchmarks
+go test -bench=. -benchmem ./internal/store
+```
+
+A fuzz target looks like `func FuzzParse(f *testing.F)`. Add seed inputs with `f.Add`, then call the parser and reject inputs that *should* error. See [Go fuzzing](https://go.dev/security/fuzz/).
+
+---
+
+## Coverage (and its trap)
+
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+Coverage tells you what ran, not what is correct. 80% of the wrong assertions is still a false sense of safety. Prefer tests of **behavior at the package boundary** over chasing a percentage. Critical packages (auth, money, migrations) deserve more attention than generated code.
+
+Go 1.26's `t.ArtifactDir()` is a good place to write coverage or golden files when you run `go test -artifacts`.
+
+## Try this
+
+Write table-driven tests for `Divide` from Chapter 3, including the zero-divisor case. Run them under `-race`.
+
+## Next step
+
+Now that we know the code works, let's keep it clean.
+
+[11-static-analysis-linting.md →](./11-static-analysis-linting.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

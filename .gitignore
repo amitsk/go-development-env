@@ -1,6 +1,7 @@
 # IDEs and Editors
 .vscode/
 *.code-workspace
+!go-dev-env.code-workspace
 .idea/
 *.suo
 *.ntvs*
@@ -17,6 +18,9 @@ Thumbs.db
 bin/
 dist/
 vendor/
+coverage.out
+*.prof
+*.test
 
 # Environment and Secrets
 .env

@@ -1,0 +1,15 @@
+[tools]
+go = "1.26"
+golangci-lint = "2"
+
+[tasks.run]
+description = "Run the heroes API"
+run = "go run ./cmd/heroes"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "golangci-lint run"

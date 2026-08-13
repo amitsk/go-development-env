@@ -1,102 +1,120 @@
 # 05. Makefile & Automation
 
-In this chapter, we'll learn how to automate repetitive tasks using a **Makefile**.
+In this chapter we automate repetitive tasks with a **Makefile**.
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [04-package-organization.md](./04-package-organization.md)] | [&rarr; [06-logging.md](./06-logging.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [04-package-organization.md](./04-package-organization.md)] | [→ [06-logging.md](./06-logging.md)]
 
 ## What is a Makefile?
 
-A **Makefile** is a simple text file used by the `make` build tool to automate tasks. While Go has powerful built-in commands like `go build` and `go test`, a Makefile allows you to:
+A **Makefile** is a text file used by the `make` build tool. Go already has `go build` and `go test`, but a Makefile lets you:
 
-- **Combine multiple steps** into a single command (e.g., format, lint, and then test).
-- **Standardize commands** so everyone on your team runs them the same way.
-- **Save time** by not having to remember long, complex command-line arguments.
+- **Combine steps** (format, vet, lint, test, then build) into one command.
+- **Standardize** so everyone on the team — and CI — runs the same thing.
+- **Forget long flags** (`go test -race -count=1 ./...`).
+
+mise can do the same job with `[tasks]` in `mise.toml`. We still show Make because it is everywhere in existing Go repos. Use one or the other; do not maintain two competing lists of commands.
+
+On Windows, use Git Bash, WSL, or [Task](https://taskfile.dev/) instead of native `nmake`.
 
 ---
 
-## The Anatomy of a Makefile
-
-A Makefile is made up of **targets**, **dependencies**, and **commands**:
+## Anatomy of a Makefile
 
 ```makefile
 target: dependency1 dependency2
-    command to run
+	command to run
 ```
 
-- **Target**: The name of the task you want to run (e.g., `build`).
-- **Dependency**: Other targets that must run *before* this one.
-- **Command**: The actual shell command to execute. **Note:** Commands MUST be indented with a **Tab** character, not spaces.
+- **Target**: the task name (`build`).
+- **Dependency**: other targets that must run first.
+- **Command**: a shell command. It **must** be indented with a real **Tab**, not spaces.
 
 ### What is `.PHONY`?
 
-By default, `make` thinks its targets are files. If you have a folder named `build`, `make build` might not run because it thinks the "file" already exists. We use `.PHONY` to tell `make` that these are just command names, not files.
+By default `make` thinks targets are files. If you have a folder named `build`, `make build` may no-op. `.PHONY` marks names that are always commands.
 
 ---
 
-## A Professional Go Makefile
+## A professional Go Makefile
 
-Here is a sample Makefile that integrates with **mise** to ensure the correct Go version is always used:
+Prefix tools with `mise exec --` so the Makefile uses the versions in `mise.toml` even if the developer forgot to activate mise:
 
 ```makefile
-# Define variables for reuse
-BINARY_NAME=heroes
+# Tools go through mise so CI and laptops match mise.toml.
+GO             := mise exec -- go
+GOLANGCI_LINT  := mise exec -- golangci-lint
+GOVULNCHECK    := mise exec -- govulncheck
 
-.PHONY: all build run test lint fmt tidy clean
+BINARY_NAME := heroes
+CMD_PATH    := ./cmd/heroes
 
-# Default target when you just run 'make'
-all: tidy fmt lint test build
+.PHONY: all tidy fmt vet lint test race build run clean vuln
 
-# Initialize and clean up dependencies
+# Default: everything a PR should pass
+all: tidy fmt vet lint test build
+
 tidy:
-	mise run go mod tidy
+	$(GO) mod tidy
 
-# Format the code according to Go standards
 fmt:
-	mise run go fmt ./...
+	$(GO) fmt ./...
 
-# Run static analysis to find potential bugs
+vet:
+	$(GO) vet ./...
+
+# golangci-lint is installed in Chapter 11
 lint:
-	# We'll learn about golangci-lint in chapter 10
-	mise run golangci-lint run
+	$(GOLANGCI_LINT) run
 
-# Run all unit tests
 test:
-	mise run go test -v ./...
+	$(GO) test ./...
 
-# Compile the application into a binary
+race:
+	$(GO) test -race -count=1 ./...
+
+vuln:
+	$(GOVULNCHECK) ./...
+
 build:
 	mkdir -p bin
-	mise run go build -o bin/$(BINARY_NAME) ./cmd/heroes
+	$(GO) build -o bin/$(BINARY_NAME) $(CMD_PATH)
 
-# Run the compiled application
 run: build
 	./bin/$(BINARY_NAME)
 
-# Remove build artifacts
 clean:
 	rm -rf bin/
 ```
 
----
-
-## How to Use It
-
-Once you've created this file in your project root, you can run:
-
-- `make build`: To just compile your app.
-- `make test`: To run your tests.
-- `make`: To run the `all` target (tidy, fmt, lint, test, and build).
+A complete copy lives in [`Makefile.template`](./Makefile.template). The sample app uses the same targets in [`heroes-service/Makefile`](./heroes-service/Makefile) (`mise exec --` when `mise` is on `PATH`).
 
 ---
 
-## Why use `mise run` inside the Makefile?
+## How to use it
 
-By prefixing your commands with `mise run`, you guarantee that the Makefile uses the exact version of Go (and other tools) defined in your project. This prevents the \"it works on my machine\" problem!
+From the project root:
 
-## Next Step
+- `make build` — compile only
+- `make test` — unit tests
+- `make race` — tests plus the race detector (slower; use before you push)
+- `make` — the `all` target (tidy, fmt, vet, lint, test, build)
 
-Now that we can automate our workflow, let's look at how to properly record what our application is doing.
+---
 
-[06-logging.md &rarr;](./06-logging.md)
+## Why `mise exec --` inside Make?
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+`mise exec -- <cmd>` puts the project's Go and linters on `PATH` for that one command. That is what kills "it works on my machine":
+
+- Laptop A has system Go 1.22.
+- The repo pins `go = "1.26"` in `mise.toml`.
+- `make test` still runs 1.26.
+
+If you prefer named tasks instead of Make, put the same recipes under `[tasks]` and run `mise run test`.
+
+## Next step
+
+Now that we can automate the workflow, let's record what the application is doing.
+
+[06-logging.md →](./06-logging.md)
+
+[← Back to [TOC](README.md#table-of-contents)]

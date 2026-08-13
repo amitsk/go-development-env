@@ -1,83 +1,141 @@
 # 03. Error Handling (The Go Way)
 
-One of the first things you'll notice in Go is that it handles errors differently than many other popular languages (like Python, Java, or JavaScript).
+One of the first things you'll notice in Go is that it handles errors differently than many other popular languages (Python, Java, JavaScript).
 
-[&larr; Back to [TOC](../README.md#table-of-contents)] | [&larr; [02-go-workspace-modules.md](../02-go-workspace-modules.md)] | [&rarr; [04-package-organization.md](./04-package-organization.md)]
+[← Back to [TOC](README.md#table-of-contents)] | [← [02-go-workspace-modules.md](./02-go-workspace-modules.md)] | [→ [04-package-organization.md](./04-package-organization.md)]
 
-## No More `try/catch`
+## No more `try/catch`
 
-In most languages, when something goes wrong, the program "throws" an exception, and you "catch" it somewhere else. This can sometimes make it hard to follow the flow of the code.
+In most languages, when something goes wrong the program "throws" an exception and you "catch" it somewhere else. That can hide the failure path.
 
-In Go, **errors are just values**. When a function might fail, it returns two things at once (like a "tuple"):
-1. The **result** you wanted.
-2. An **error** (if something went wrong).
+In Go, **errors are values**. When a function might fail, it returns two things:
+
+1. The **result** you wanted (the zero value if it failed).
+2. An **error** (`nil` if nothing went wrong).
+
+| | Exceptions (Java / Python) | Go errors |
+|--|----------------------------|-----------|
+| How failure is signaled | Thrown, unwinds the stack | Returned as a value |
+| Visible in the signature? | Often not (`RuntimeException`) | Yes: `(T, error)` |
+| Easy to ignore? | Empty `catch` | `_ = f()` or skipping the `if` — linters catch this |
+| Adding context | Wrap / cause chain | `fmt.Errorf("…: %w", err)` |
 
 ---
 
-## The (Value, Error) Pattern
+## The (value, error) pattern
 
-Think of it like a receipt from a store. The function gives you the item you bought AND a receipt. You check the receipt to see if there was a problem before you start using the item.
-
-### Example: A Function That Can Fail
+Think of it like a receipt. The function gives you the item *and* a receipt. Check the receipt before you use the item.
 
 ```go
 func Divide(a, b float64) (float64, error) {
     if b == 0 {
-        // We can't divide by zero, so we return an error
         return 0, fmt.Errorf("cannot divide by zero")
     }
-    // Success! We return the result and 'nil' for the error
     return a / b, nil
 }
 ```
 
 ---
 
-## Checking for Errors
+## Checking for errors
 
-Because Go functions return errors explicitly, you'll see this pattern everywhere in Go code:
+This pattern is everywhere in Go:
 
 ```go
 result, err := Divide(10, 0)
-
-// 1. Check if the error is NOT 'nil' (meaning something happened)
 if err != nil {
-    // 2. Handle the error (like logging it or returning it)
     fmt.Println("Oops!", err)
     return
 }
 
-// 3. If we get here, we know 'err' is nil and 'result' is safe to use!
 fmt.Println("Result is:", result)
 ```
 
-### Why is this good for beginners?
-- **No Surprises**: You always know exactly which functions can fail because it's right there in the signature.
-- **Locality**: You handle the problem right where it happens, which makes the code much easier to read and debug.
-- **Safety**: It's much harder to accidentally ignore a problem in Go.
+### Why this is good for beginners
+
+- **No surprises**: functions that can fail say so in the signature.
+- **Locality**: you handle the problem next to the call, which makes debugging easier.
+- **Safety**: `golangci-lint`'s `errcheck` will complain if you ignore an error.
+
+Never do this:
+
+```go
+result, _ := Divide(10, 0) // the error is gone
+```
 
 ---
 
-## "Bubbling Up" Errors
+## Wrapping and bubbling errors
 
-Sometimes, you don't know how to fix the error in the current function. In that case, you just "bubble it up" to the person who called you:
+Sometimes you cannot fix the error here. Return it to the caller — and **add context** so the top of the stack still knows *what* failed.
+
+Use `%w` (wrap) so the original error is still inspectable:
 
 ```go
 func ProcessData() error {
     result, err := Divide(10, 0)
     if err != nil {
-        // Return the error so the caller can handle it
-        return err 
+        return fmt.Errorf("process data: %w", err)
     }
-    // ... use result ...
+    _ = result
     return nil
 }
 ```
 
-## Next Step
+`%v` or `%s` stringifies the error and **breaks** the chain. Prefer `%w` unless you intentionally want to hide the cause.
 
-Now that we know how to handle problems safely, let's look at how to organize our project folders.
+---
 
-[04-package-organization.md &rarr;](./04-package-organization.md)
+## `errors.Is`, `errors.As`, and `errors.AsType`
 
-[&larr; Back to [TOC](../README.md#table-of-contents)]
+Sentinel errors (package-level variables) and custom types let callers branch on *what* went wrong.
+
+```go
+var ErrNotFound = errors.New("not found")
+
+func FindHero(id int) (*Hero, error) {
+    if id <= 0 {
+        return nil, fmt.Errorf("find hero %d: %w", id, ErrNotFound)
+    }
+    // ...
+    return hero, nil
+}
+
+func handler() error {
+    hero, err := FindHero(-1)
+    if errors.Is(err, ErrNotFound) {
+        // 404, not a crash
+        return nil
+    }
+    if err != nil {
+        return err
+    }
+    _ = hero
+    return nil
+}
+```
+
+- **`errors.Is(err, ErrNotFound)`** — walks the wrap chain for a matching sentinel.
+- **`errors.As(err, &target)`** — walks the chain for a specific type (for example `*os.PathError`).
+- **`errors.AsType[E](err)`** (Go 1.26) — a generic, type-safe form of `As`. Prefer it on Go 1.26+.
+
+```go
+if pathErr, ok := errors.AsType[*os.PathError](err); ok {
+    fmt.Println("path problem:", pathErr.Path)
+}
+```
+
+---
+
+## Try this
+
+1. Change `ProcessData` to wrap with `%v` instead of `%w`. Confirm `errors.Is` no longer matches.
+2. Find a `_, _ =` or ignored error in an old project (or in Chapter 8's first GORM snippet from older tutorials) and fix it.
+
+## Next step
+
+Now that we can handle problems safely, let's organize the project folders.
+
+[04-package-organization.md →](./04-package-organization.md)
+
+[← Back to [TOC](README.md#table-of-contents)]
